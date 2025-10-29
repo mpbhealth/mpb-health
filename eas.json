@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 5.9.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "image": "macos-sequoia-15.5-xcode-16.4"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "image": "macos-sequoia-15.5-xcode-16.4"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "resourceClass": "medium",
+      "android": {
+        "image": "latest"
+      },
+      "ios": {
+        "image": "macos-sequoia-15.5-xcode-16.4"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
