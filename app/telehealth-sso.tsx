@@ -9,41 +9,136 @@ import {
   TouchableOpacity,
   BackHandler,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Stethoscope, ExternalLink, AlertCircle } from 'lucide-react-native';
+import { Stethoscope, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Constants from 'expo-constants';
 import { BackButton } from '@/components/common/BackButton';
-import { WebViewContainer } from '@/components/common/WebViewContainer';
+import { TelehealthWebView, TelehealthWebViewRef } from '@/components/telehealth/TelehealthWebView';
 import { useUserData } from '@/hooks/useUserData';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAYS = [1000, 2000, 4000];
 
 export default function TelehealthSSOScreen() {
   const router = useRouter();
   const { redirectId } = useLocalSearchParams<{ redirectId?: string }>();
   const { userData, loading: userLoading } = useUserData();
   const { session } = useAuth();
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMemberNotFound, setShowMemberNotFound] = useState(false);
   const [ssoUrl, setSsoUrl] = useState<string | null>(null);
+  const [initialSsoUrl, setInitialSsoUrl] = useState<string | null>(null);
   const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
-  const webViewRef = React.useRef<WebView>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  const [hasUnsavedFormData, setHasUnsavedFormData] = useState(false);
+  const [showFuturePlanModal, setShowFuturePlanModal] = useState(false);
+  const [planStartDate, setPlanStartDate] = useState<string | null>(null);
+  const telehealthWebViewRef = React.useRef<TelehealthWebViewRef>(null);
 
   useEffect(() => {
     if (!userLoading && userData && session) {
-      initiateSSO();
+      checkPlanActivation();
     }
   }, [userLoading, userData, session]);
+
+  const checkPlanActivation = () => {
+    if (!userData?.active_date) {
+      initiateSSO();
+      return;
+    }
+
+    const activeDateObj = new Date(userData.active_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    activeDateObj.setHours(0, 0, 0, 0);
+
+    if (activeDateObj > today) {
+      setPlanStartDate(userData.active_date);
+      setShowFuturePlanModal(true);
+    } else {
+      initiateSSO();
+    }
+  };
+
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const checkNetworkConnectivity = async (): Promise<boolean> => {
+    const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
+
+    if (!supabaseUrl) {
+      return false;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+        method: 'HEAD',
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      return response.status === 200 || response.status === 401 || response.status === 404;
+    } catch {
+      return false;
+    }
+  };
+
+  const makeSSORequest = async (
+    apiUrl: string,
+    headers: Record<string, string>,
+    body: string,
+    attempt: number = 0
+  ): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = attempt === 0 ? 30000 : 15000;
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return response;
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+        const isConnected = await checkNetworkConnectivity();
+
+        if (!isConnected) {
+          throw new Error('NO_NETWORK');
+        }
+
+        const delayMs = RETRY_DELAYS[attempt];
+        setRetryMessage(`Connection issue detected. Retrying in ${delayMs / 1000} seconds...`);
+        await delay(delayMs);
+        setRetryMessage(null);
+
+        return makeSSORequest(apiUrl, headers, body, attempt + 1);
+      }
+
+      throw err;
+    }
+  };
 
   const initiateSSO = async () => {
     try {
       setIsLoading(true);
       setError(null);
       setShowMemberNotFound(false);
+      setRetryMessage(null);
 
       if (!session?.access_token) {
         throw new Error('Authentication required. Please sign in again.');
@@ -53,11 +148,26 @@ export default function TelehealthSSOScreen() {
         throw new Error('Member ID not found. Please contact support.');
       }
 
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const anonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl) {
+        throw new Error('Service configuration error. Please contact support.');
+      }
+
+      if (!anonKey) {
+        throw new Error('Service authentication configuration error. Please contact support.');
+      }
+
       console.log('Initiating MyTelemedicine SSO for member:', userData.member_id);
 
-      // Call the Supabase Edge Function
-      const apiUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/mytelemedicine-sso`;
-      
+      const isConnected = await checkNetworkConnectivity();
+      if (!isConnected) {
+        throw new Error('NO_NETWORK');
+      }
+
+      const apiUrl = `${supabaseUrl}/functions/v1/mytelemedicine-sso`;
+
       const headers = {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
@@ -69,93 +179,219 @@ export default function TelehealthSSOScreen() {
       });
 
       console.log('Making SSO request to Edge Function...');
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body,
-      });
 
-      const responseData = await response.json();
+      const response = await makeSSORequest(apiUrl, headers, body);
+
+      let responseData;
+      try {
+        const responseText = await response.text();
+
+        if (!responseText || responseText.trim() === '') {
+          throw new Error('Empty response from server');
+        }
+
+        responseData = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error('Failed to parse response:', parseErr);
+        throw new Error('Invalid response from telehealth service. Please try again.');
+      }
 
       if (!response.ok) {
-        // Check for member not found error
-        if (response.status === 400 && responseData.error?.includes('Member not found')) {
+        // Check if member not found
+        if (
+          responseData?.memberNotFound ||
+          response.status === 404 ||
+          responseData?.error?.toLowerCase().includes('member not found')
+        ) {
+          console.log('Member not found in telehealth system');
           setShowMemberNotFound(true);
           return;
         }
-        throw new Error(responseData.error || 'Failed to generate SSO access');
+
+        if (response.status >= 500) {
+          throw new Error('Telehealth service is temporarily unavailable. Please try again in a few minutes.');
+        }
+
+        throw new Error(responseData?.error || 'Failed to generate SSO access');
+      }
+
+      if (!responseData || typeof responseData !== 'object') {
+        throw new Error('Invalid response format from telehealth service');
       }
 
       if (!responseData.success || !responseData.ssoUrl) {
-        throw new Error('Invalid response from SSO service');
+        throw new Error('Incomplete response from SSO service. Please try again.');
       }
 
-      console.log('SSO URL generated successfully, opening browser...');
+      if (typeof responseData.ssoUrl !== 'string' || !responseData.ssoUrl.startsWith('http')) {
+        throw new Error('Invalid SSO URL received. Please contact support.');
+      }
 
-      // Set the SSO URL to show in WebView
+      console.log('SSO URL generated successfully');
       setSsoUrl(responseData.ssoUrl);
+      if (!initialSsoUrl) {
+        setInitialSsoUrl(responseData.ssoUrl);
+      }
+      setRetryCount(0);
 
     } catch (err) {
       console.error('MyTelemedicine SSO error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      
-      // Check for specific telehealth access generation error
+
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+
+      if (err instanceof Error) {
+        if (err.message === 'NO_NETWORK') {
+          errorMessage = 'No internet connection detected. Please check your network and try again.';
+        } else if (err.name === 'AbortError') {
+          errorMessage = 'Connection timed out. Please check your internet connection and try again.';
+        } else if (err.message.includes('Network request failed')) {
+          errorMessage = 'Unable to reach telehealth services. Please check your connection and try again.';
+        } else if (err.message.includes('JSON')) {
+          errorMessage = 'Invalid response from server. Please try again.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
       if (errorMessage.includes('Failed to generate telehealth access')) {
         setError('TELEHEALTH_ACTIVATION_PENDING');
       } else {
         setError(errorMessage);
       }
+
+      setRetryCount(prev => prev + 1);
     } finally {
       setIsLoading(false);
+      setRetryMessage(null);
     }
   };
 
-  // Handle Android back button for WebView navigation
+  const handleRetry = () => {
+    setError(null);
+    setShowMemberNotFound(false);
+    initiateSSO();
+  };
+
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (ssoUrl) {
         handleBackPress();
-        return true; // Prevent default back behavior
+        return true;
       }
-      return false; // Allow default back behavior
+      return false;
     });
 
     return () => backHandler.remove();
-  }, [ssoUrl, webViewCanGoBack]);
+  }, [ssoUrl, webViewCanGoBack, hasUnsavedFormData]);
 
   const handleBackPress = () => {
-    if (webViewCanGoBack && webViewRef.current) {
-      // If WebView can go back, navigate back within WebView
-      webViewRef.current.goBack();
-    } else {
-      // If WebView cannot go back, show exit confirmation
-      Alert.alert(
-        'Exit Telehealth',
-        'Are you sure you want to exit the telehealth portal?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Exit', 
-            style: 'destructive', 
-            onPress: () => {
-              setSsoUrl(null);
-              router.back();
-            }
-          }
-        ]
-      );
+    if (webViewCanGoBack && telehealthWebViewRef.current?.goBackInWebView) {
+      telehealthWebViewRef.current.goBackInWebView();
+      return;
     }
+
+    const message = hasUnsavedFormData
+      ? 'You have unsaved form data. Are you sure you want to exit the telehealth portal?'
+      : 'Are you sure you want to exit the telehealth portal?';
+
+    Alert.alert(
+      'Exit Telehealth',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Exit',
+          style: 'destructive',
+          onPress: () => {
+            setSsoUrl(null);
+            setInitialSsoUrl(null);
+            router.back();
+          }
+        }
+      ]
+    );
   };
 
   const handleNavigationStateChange = (navState: any) => {
     setWebViewCanGoBack(navState.canGoBack);
   };
 
+  const handleFormStateChange = (hasUnsavedData: boolean) => {
+    setHasUnsavedFormData(hasUnsavedData);
+  };
+
+  const handleFormSubmitSuccess = () => {
+    setHasUnsavedFormData(false);
+  };
+
+  const handleSessionExpired = () => {
+    setSsoUrl(null);
+    setError('Your session has expired. Please try again.');
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const handleScheduleCall = () => {
+    router.push('/member-services');
+  };
+
   if (userLoading) {
     return <LoadingIndicator message="Loading user data..." />;
   }
 
-  // Show WebView if SSO URL is available
+  if (showFuturePlanModal && planStartDate) {
+    return (
+      <View style={styles.container}>
+        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+          <BackButton onPress={() => router.back()} />
+          <View style={styles.headerContent}>
+            <Stethoscope size={24} color={colors.primary.main} />
+            <Text style={styles.headerTitle}>Telehealth Portal</Text>
+          </View>
+        </Animated.View>
+
+        <View style={styles.content}>
+          <Animated.View style={styles.futurePlanContainer} entering={FadeInUp.delay(200)}>
+            <View style={styles.futurePlanCard}>
+              <Stethoscope size={48} color={colors.primary.main} style={styles.futurePlanIcon} />
+              <Text style={styles.futurePlanTitle}>Telehealth Coming Soon</Text>
+              <Text style={styles.futurePlanDate}>{formatDate(planStartDate)}</Text>
+              <Text style={styles.futurePlanText}>
+                Your telehealth access will be available starting {formatDate(planStartDate)} when your plan becomes active.
+              </Text>
+              <Text style={styles.futurePlanSubtext}>
+                In the meantime, schedule a welcome call with our team to learn about your benefits.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.scheduleButton}
+                onPress={handleScheduleCall}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.scheduleButtonText}>Schedule Welcome Call</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.backButtonText}>Go Back</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </View>
+    );
+  }
+
   if (ssoUrl) {
     return (
       <View style={styles.container}>
@@ -168,11 +404,18 @@ export default function TelehealthSSOScreen() {
         </Animated.View>
 
         <View style={styles.webviewContainer}>
-          <WebViewContainer 
-            ref={webViewRef}
+          <TelehealthWebView
+            ref={telehealthWebViewRef}
             url={ssoUrl}
+            initialUrl={initialSsoUrl || undefined}
+            memberId={userData?.member_id || ''}
             onNavigationStateChange={handleNavigationStateChange}
-            javaScriptEnabled={true}
+            onFormStateChange={handleFormStateChange}
+            onFormSubmitSuccess={handleFormSubmitSuccess}
+            onSessionExpired={handleSessionExpired}
+            onError={(error) => {
+              console.error('TelehealthWebView error:', error);
+            }}
           />
         </View>
       </View>
@@ -196,8 +439,13 @@ export default function TelehealthSSOScreen() {
               <ActivityIndicator size="large" color={colors.primary.main} style={styles.spinner} />
               <Text style={styles.loadingTitle}>Connecting to Telehealth</Text>
               <Text style={styles.loadingText}>
-                We're securely connecting you to your telehealth portal...
+                {retryMessage || "We're securely connecting you to your telehealth portal..."}
               </Text>
+              {retryCount > 0 && (
+                <Text style={styles.retryText}>
+                  Attempt {retryCount + 1} of {MAX_RETRY_ATTEMPTS}
+                </Text>
+              )}
             </View>
           </Animated.View>
         ) : showMemberNotFound ? (
@@ -208,7 +456,7 @@ export default function TelehealthSSOScreen() {
               <Text style={styles.memberNotFoundText}>
                 Your membership could not be found in the telehealth system. Our Concierge team can help resolve this issue.
               </Text>
-              
+
               <TouchableOpacity
                 style={styles.conciergeButton}
                 onPress={() => router.push('/(tabs)/chat')}
@@ -236,7 +484,7 @@ export default function TelehealthSSOScreen() {
                   <Text style={styles.errorText}>
                     Your telehealth access is still being processed. This can take some time after enrollment.
                   </Text>
-                  
+
                   <TouchableOpacity
                     style={styles.conciergeButton}
                     onPress={() => router.push('/(tabs)/chat')}
@@ -258,7 +506,16 @@ export default function TelehealthSSOScreen() {
                   <AlertCircle size={48} color={colors.status.error} style={styles.errorIcon} />
                   <Text style={styles.errorTitle}>Connection Failed</Text>
                   <Text style={styles.errorText}>{error}</Text>
-                  
+
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={handleRetry}
+                    activeOpacity={0.8}
+                  >
+                    <RefreshCw size={20} color={colors.background.default} />
+                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  </TouchableOpacity>
+
                   <View style={styles.errorActions}>
                     <Text style={styles.helpText}>
                       If this problem persists, please contact our Concierge team for assistance.
@@ -340,6 +597,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  retryText: {
+    ...typography.body2,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    fontStyle: 'italic',
+  },
   memberNotFoundContainer: {
     alignItems: 'center',
   },
@@ -420,6 +684,24 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     lineHeight: 24,
   },
+  retryButton: {
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    width: '100%',
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    ...shadows.md,
+  },
+  retryButtonText: {
+    ...typography.body1,
+    color: colors.background.default,
+    fontWeight: '600',
+  },
   errorActions: {
     width: '100%',
   },
@@ -458,5 +740,62 @@ const styles = StyleSheet.create({
   },
   webviewContainer: {
     flex: 1,
+  },
+  futurePlanContainer: {
+    alignItems: 'center',
+  },
+  futurePlanCard: {
+    backgroundColor: colors.background.default,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    ...shadows.lg,
+    maxWidth: 350,
+    width: '100%',
+  },
+  futurePlanIcon: {
+    marginBottom: spacing.lg,
+  },
+  futurePlanTitle: {
+    ...typography.h3,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  futurePlanDate: {
+    ...typography.h4,
+    color: colors.primary.main,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  futurePlanText: {
+    ...typography.body1,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 24,
+  },
+  futurePlanSubtext: {
+    ...typography.body2,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 20,
+  },
+  scheduleButton: {
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    width: '100%',
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  scheduleButtonText: {
+    ...typography.body1,
+    color: colors.background.default,
+    fontWeight: '600',
   },
 });

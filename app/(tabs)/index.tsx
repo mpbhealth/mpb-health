@@ -1,31 +1,29 @@
-// src/screens/HomeScreen.tsx
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Platform,
   RefreshControl,
-  useWindowDimensions,
-  StyleProp,
-  ViewStyle,
   Modal,
+  Image,
+  useWindowDimensions,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Play,
   Tag,
   Users as Users2,
-  Wallet,
-  MessageSquare,
   ChevronRight,
   Bell,
   HelpCircle,
   FlaskRound as Flask,
   Heart,
   Stethoscope,
+  Pill,
+  AlertTriangle,
   type LucideIcon,
 } from 'lucide-react-native';
 import Animated, {
@@ -39,12 +37,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
+import { colors, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const logoImg = require('../../assets/images/logo.png');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const ANDROID = Platform.OS === 'android';
 
 const TELE_DERM_DISCLAIMER =
   'Telehealth includes Urgent Care, Primary Care, Mental Health, and Pet Telehealth. Your dermatology benefit includes 3 free visits per family, per year. After that there is a $60 consultation fee.';
@@ -71,34 +72,28 @@ function AnimatedServiceCard({
   service,
   index,
   onPress,
-  containerStyle,
 }: {
   service: Service;
   index: number;
   onPress: () => void;
-  containerStyle?: StyleProp<ViewStyle>;
 }) {
   const scale = useSharedValue(1);
-  const shadowOpacity = useSharedValue(0.1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    shadowOpacity: shadowOpacity.value,
   }));
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
-    shadowOpacity.value = withTiming(0.2, { duration: 150 });
   };
 
   const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    shadowOpacity.value = withTiming(0.1, { duration: 150 });
   };
 
   return (
     <AnimatedTouchable
-      style={[styles.serviceCard, styles.cardSurface, animatedStyle, containerStyle]}
+      style={[styles.serviceCard, animatedStyle]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -110,19 +105,19 @@ function AnimatedServiceCard({
     >
       <View style={styles.serviceCardContent}>
         <View style={[styles.serviceIconContainer, { backgroundColor: service.gradient }]}>
-          <service.icon size={26} color={service.color} />
+          <service.icon size={moderateScale(24)} color={service.color} />
         </View>
         <View style={styles.serviceTextContainer}>
-          <Text style={styles.serviceTitle} numberOfLines={1} ellipsizeMode="tail">
+          <SmartText variant="h4" maxLines={2}>
             {service.title}
-          </Text>
-          <Text style={styles.serviceDescription} numberOfLines={2} ellipsizeMode="tail">
+          </SmartText>
+          <SmartText variant="body2" style={styles.serviceDescription} maxLines={3}>
             {service.description}
-          </Text>
+          </SmartText>
         </View>
       </View>
       <View style={[styles.chevronContainer, { backgroundColor: service.gradient }]}>
-        <ChevronRight size={18} color={service.color} />
+        <ChevronRight size={moderateScale(18)} color={service.color} />
       </View>
     </AnimatedTouchable>
   );
@@ -142,26 +137,22 @@ function QuickActionCard({
   onPress: () => void;
 }) {
   const scale = useSharedValue(1);
-  const shadowOpacity = useSharedValue(0.1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    shadowOpacity: shadowOpacity.value,
   }));
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
-    shadowOpacity.value = withTiming(0.2, { duration: 150 });
   };
 
   const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    shadowOpacity.value = withTiming(0.1, { duration: 150 });
   };
 
   return (
     <AnimatedTouchable
-      style={[styles.quickActionCard, styles.cardSurface, animatedStyle]}
+      style={[styles.quickActionCard, animatedStyle]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -170,11 +161,11 @@ function QuickActionCard({
       accessibilityLabel={`Open ${action.title.replace('\n', ' ')}`}
     >
       <View style={[styles.quickActionIconContainer, { backgroundColor: action.gradient }]}>
-        <action.icon size={24} color={action.color} />
+        <action.icon size={moderateScale(20)} color={action.color} />
       </View>
-      <Text style={styles.quickActionText} numberOfLines={2} ellipsizeMode="tail">
+      <SmartText variant="body2" style={styles.quickActionText} maxLines={2}>
         {action.title}
-      </Text>
+      </SmartText>
     </AnimatedTouchable>
   );
 }
@@ -185,16 +176,67 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [hasUnreadNotifications] = useState(true);
   const [showTelehealthDisclaimer, setShowTelehealthDisclaimer] = useState(false);
+  const [showPendingActivationModal, setShowPendingActivationModal] = useState(false);
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
+  const dimensions = useWindowDimensions();
+  const { isTablet, isExtraSmall } = useResponsive();
 
-  const svcCols = useMemo(() => (isTablet ? 2 : 1), [isTablet]);
+  useEffect(() => {
+    const dimensionHandler = Dimensions.addEventListener('change', () => {
+    });
+
+    return () => {
+      dimensionHandler?.remove();
+    };
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
+
+  const inactiveDateWarning = useMemo(() => {
+    if (!userData?.inactive_date) return null;
+
+    const inactiveDateStr = userData.inactive_date;
+    const [year, month, day] = inactiveDateStr.split('-').map(Number);
+    const inactiveDate = new Date(year, month - 1, day);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (inactiveDate <= today) return null;
+
+    const daysUntilInactive = Math.ceil((inactiveDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const formattedDate = inactiveDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    return { daysUntilInactive, formattedDate };
+  }, [userData?.inactive_date]);
+
+  const pendingActivation = useMemo(() => {
+    if (!userData?.active_date) return null;
+
+    const activeDateStr = userData.active_date;
+    const [year, month, day] = activeDateStr.split('-').map(Number);
+    const activeDate = new Date(year, month - 1, day);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    activeDate.setHours(0, 0, 0, 0);
+
+    if (activeDate <= today) return null;
+
+    const daysUntilActive = Math.ceil((activeDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const formattedDate = activeDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    return { daysUntilActive, formattedDate };
+  }, [userData?.active_date]);
+
+  useEffect(() => {
+    if (pendingActivation && !loading) {
+      setShowPendingActivationModal(true);
+    }
+  }, [pendingActivation, loading]);
 
   const healthWalletProductIds = new Set(['44036', '45800', '45388', '46455', '45742']);
   const shouldShowHealthWallet = healthWalletProductIds.has(userData?.normalized_product_id ?? userData?.product_id ?? '');
@@ -202,58 +244,59 @@ export default function HomeScreen() {
   const normalizedProductId = userData?.normalized_product_id ?? userData?.product_id;
 
   const quickActions = [
-    { title: 'RX &\nDiagnostics', route: '/labs-testing', color: colors.primary.main, gradient: rgbaFromHex(colors.primary.main, 0.15), icon: Flask },
-    { title: 'Member\nForms', route: '/member-services', color: colors.secondary.main, gradient: rgbaFromHex(colors.secondary.main, 0.15), icon: MessageSquare },
-    { title: 'Find\nDiscounts', route: '/discounts', color: colors.primary.dark, gradient: rgbaFromHex(colors.primary.dark, 0.15), icon: Tag },
+    { title: 'RX & Diagnostics', route: '/labs-testing', color: colors.primary.main, gradient: rgbaFromHex(colors.primary.main, 0.15), icon: Flask },
+    { title: 'Member Forms', route: '/member-services', color: colors.secondary.main, gradient: rgbaFromHex(colors.secondary.main, 0.15), icon: Users2 },
+    { title: 'Find Discounts', route: '/discounts', color: colors.primary.dark, gradient: rgbaFromHex(colors.primary.dark, 0.15), icon: Tag },
   ] as const;
 
-  const allServices: Service[] = [
+  const allServicesBase = [
+    {
+      title: 'Telehealth',
+      description: 'Virtual Urgent Care, Primary Care, and Mental Health Options',
+      icon: Stethoscope,
+      route: '/telehealth-sso',
+    },
     ...(shouldShowHealthWallet
       ? [
           {
-            title: 'Health Wallet',
-            description: 'Access your digital health wallet and benefits',
-            icon: Wallet,
+            title: 'Rx Valet and Benefit Card',
+            description: 'Access rx valet and benefit card',
+            icon: Pill,
             route: '/health-wallet',
-            color: colors.primary.main,
-            gradient: rgbaFromHex(colors.primary.main, 0.15),
           },
         ]
-      : [
-          {
-            title: 'Telehealth',
-            description: 'Access Unlimited Virtual Urgent Care, Primary Care, and Mental Health Options',
-            icon: Stethoscope,
-            route: '/telehealth-sso',
-            color: colors.primary.main,
-            gradient: rgbaFromHex(colors.primary.main, 0.15),
-          },
-        ]),
+      : []),
     {
       title: 'Care Services',
       description: 'Find providers and access other medical services',
       icon: Heart,
       route: '/care',
-      color: colors.secondary.main,
-      gradient: rgbaFromHex(colors.secondary.main, 0.15),
     },
     {
       title: hospitalDebtReliefProductIds.has(String(normalizedProductId || '')) ? 'Hospital Debt Relief' : 'Sharing',
       description: hospitalDebtReliefProductIds.has(String(normalizedProductId || '')) ? 'Eligibility Application' : 'Submit and manage medical needs',
       icon: Users2,
       route: hospitalDebtReliefProductIds.has(String(normalizedProductId || '')) ? '/hospital-debt-relief' : '/sharing',
-      color: colors.primary.main,
-      gradient: rgbaFromHex(colors.primary.main, 0.15),
     },
     {
       title: 'HealthCare Podcast',
       description: 'Watch health and wellness videos to stay informed',
       icon: Play,
       route: '/healthy-podcast',
-      color: colors.secondary.dark,
-      gradient: rgbaFromHex(colors.secondary.dark, 0.15),
     },
   ];
+
+  const allServices: Service[] = allServicesBase.map((service, index) => {
+    const isBlue = index % 2 === 0;
+    const color = isBlue ? colors.primary.main : colors.secondary.main;
+    const gradient = rgbaFromHex(color, 0.15);
+
+    return {
+      ...service,
+      color,
+      gradient,
+    };
+  });
 
   const handleServicePress = (svc: Service) => {
     if (svc.route === '/telehealth-sso') {
@@ -272,21 +315,20 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? insets.top + 8 : spacing.xl }]}
+        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? insets.top + responsiveSize.sm : responsiveSize.xl }]}
       >
         <View style={[styles.headerContent, isTablet && styles.tabletHeaderContent]}>
           <View style={styles.headerTop}>
             <Animated.Image source={logoImg} style={styles.logo} resizeMode="contain" entering={FadeInUp.delay(150)} />
             <Animated.View style={styles.headerActions} entering={FadeInUp.delay(200)}>
               <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/what-to-do')}>
-                <HelpCircle size={22} color={colors.primary.main} />
+                <HelpCircle size={moderateScale(22)} color={colors.primary.main} />
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/notifications')}>
-                <Bell size={22} color={colors.primary.main} />
+                <Bell size={moderateScale(22)} color={colors.primary.main} />
                 {hasUnreadNotifications && (
                   <View style={styles.badgeOuter}>
                     <View style={styles.badgeInner} />
@@ -297,221 +339,378 @@ export default function HomeScreen() {
           </View>
 
           <Animated.View style={styles.welcomeSection} entering={FadeInUp.delay(250)}>
-            <Text style={styles.greeting}>Hi, {userData?.first_name || 'Member'}!</Text>
-            <Text style={styles.welcomeMessage}>Here's your health dashboard</Text>
+            <SmartText variant="h2" maxLines={1} truncate>
+              Hi, {userData?.first_name || 'Member'}!
+            </SmartText>
+            <SmartText variant="body1" style={styles.welcomeMessage} maxLines={1} truncate>
+              Here's your health dashboard
+            </SmartText>
           </Animated.View>
         </View>
       </Animated.View>
 
-      {/* CONTENT */}
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.main} />}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom + responsiveSize.xl, responsiveSize.xl * 2) }
+        ]}
       >
-        {/* QUICK ACTIONS */}
+        {inactiveDateWarning && (
+          <Animated.View style={styles.warningBanner} entering={FadeInDown.delay(250)}>
+            <View style={styles.warningIconContainer}>
+              <AlertTriangle size={moderateScale(20)} color={colors.status.warning} />
+            </View>
+            <View style={styles.warningContent}>
+              <SmartText variant="h4" style={styles.warningTitle} maxLines={1}>
+                Membership Ending Soon
+              </SmartText>
+              <SmartText variant="body2" style={styles.warningMessage}>
+                Your membership will end on {inactiveDateWarning.formattedDate} ({inactiveDateWarning.daysUntilInactive} {inactiveDateWarning.daysUntilInactive === 1 ? 'day' : 'days'} remaining). We'd love to keep you as part of our community!{' '}
+                <SmartText variant="body2" style={styles.warningLink} onPress={() => router.push('/auth/member-support')}>
+                  Contact our Concierge
+                </SmartText>
+                {' '}to discuss your options and continue your health journey with us.
+              </SmartText>
+            </View>
+          </Animated.View>
+        )}
+
         <Animated.View style={[styles.quickActionsSection, isTablet && styles.tabletQuickActionsSection]} entering={FadeInUp.delay(300)}>
-          <View style={styles.quickActionsGrid}>
+          <View style={[styles.quickActionsGrid, isExtraSmall && styles.quickActionsGridExtraSmall]}>
             {quickActions.map((action) => (
               <QuickActionCard key={action.title} action={action} onPress={() => router.push(action.route as never)} />
             ))}
           </View>
         </Animated.View>
 
-        {/* SERVICES */}
         <Animated.View style={styles.servicesSection} entering={FadeInUp.delay(400)}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Health Services</Text>
-            <Text style={styles.sectionSubtitle}>Quick access to your care options</Text>
+            <SmartText variant="h3" maxLines={1}>
+              Health Services
+            </SmartText>
+            <SmartText variant="body1" style={styles.sectionSubtitle}>
+              Quick access to your care options
+            </SmartText>
           </View>
 
           <View style={[styles.servicesGrid, isTablet && styles.tabletServicesGrid]}>
             {allServices.map((svc, idx) => (
-              <AnimatedServiceCard
+              <View
                 key={svc.title}
-                service={svc}
-                index={idx}
-                onPress={() => handleServicePress(svc)}
-                containerStyle={[
-                  styles.serviceCardContainer,
-                  isTablet && styles.serviceCardTablet,
-                ]}
-              />
+                style={[styles.serviceCardContainer, isTablet && styles.serviceCardTablet]}
+              >
+                <AnimatedServiceCard service={svc} index={idx} onPress={() => handleServicePress(svc)} />
+              </View>
             ))}
           </View>
         </Animated.View>
       </ScrollView>
 
-      {/* Telehealth Disclaimer Modal (single action) */}
       <Modal
         transparent
         visible={showTelehealthDisclaimer}
         animationType="fade"
         onRequestClose={() => setShowTelehealthDisclaimer(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, styles.cardSurface]}>
-            <Text style={styles.modalTitle}>Before you continue</Text>
-            <Text style={styles.modalMessage}>{TELE_DERM_DISCLAIMER}</Text>
+        <View style={[styles.modalOverlay, {
+          paddingTop: Math.max(insets.top, responsiveSize.lg),
+          paddingBottom: Math.max(insets.bottom, responsiveSize.lg),
+        }]}>
+          <Card padding="lg" variant="elevated" style={styles.modalCard}>
+            <SmartText variant="h3" maxLines={2} truncate style={styles.modalTitle}>
+              Before you continue
+            </SmartText>
+            <SmartText variant="body1" style={styles.modalMessage}>
+              {TELE_DERM_DISCLAIMER}
+            </SmartText>
 
             <TouchableOpacity
-              style={[styles.modalBtn, styles.confirmBtn]}
+              style={styles.confirmBtn}
               onPress={handleConfirmTelehealth}
               activeOpacity={0.9}
               accessibilityRole="button"
               accessibilityLabel="Continue to Telehealth"
             >
-              <Text style={styles.confirmBtnText}>Continue</Text>
+              <SmartText variant="body1" style={styles.confirmBtnText}>
+                Continue
+              </SmartText>
             </TouchableOpacity>
-          </View>
+          </Card>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={showPendingActivationModal}
+        animationType="fade"
+        onRequestClose={() => setShowPendingActivationModal(false)}
+      >
+        <View style={[styles.modalOverlay, {
+          paddingTop: Math.max(insets.top, responsiveSize.lg),
+          paddingBottom: Math.max(insets.bottom, responsiveSize.lg),
+        }]}>
+          <Card padding="lg" variant="elevated" style={styles.modalCard}>
+            <View style={styles.pendingActivationIcon}>
+              <AlertTriangle size={moderateScale(32)} color={colors.status.info} />
+            </View>
+            <SmartText variant="h3" style={styles.pendingActivationTitle}>
+              Your Membership Starts Soon
+            </SmartText>
+            <View style={styles.activationDateContainer}>
+              <SmartText variant="h4" style={styles.activationDateLabel}>
+                Plan Start Date
+              </SmartText>
+              <SmartText variant="h3" style={styles.activationDate}>
+                {pendingActivation?.formattedDate}
+              </SmartText>
+              <SmartText variant="body2" style={styles.daysUntilActive}>
+                {pendingActivation?.daysUntilActive} {pendingActivation?.daysUntilActive === 1 ? 'day' : 'days'} from now
+              </SmartText>
+            </View>
+
+            <SmartText variant="body1" style={styles.modalMessage}>
+              Your telehealth and other membership features will be available starting {pendingActivation?.formattedDate} when your plan becomes active.
+            </SmartText>
+            <SmartText variant="body1" style={styles.modalMessageSecondary}>
+              In the meantime, schedule a welcome call with our team to learn about your benefits.
+            </SmartText>
+
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => {
+                setShowPendingActivationModal(false);
+                router.push('/member-services' as never);
+              }}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Schedule Welcome Call"
+            >
+              <SmartText variant="body1" style={styles.confirmBtnText}>
+                Schedule Welcome Call
+              </SmartText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => {
+                setShowPendingActivationModal(false);
+                router.push('/(tabs)/chat' as never);
+              }}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Contact Concierge"
+            >
+              <SmartText variant="body1" style={styles.secondaryBtnText}>
+                Contact Concierge
+              </SmartText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.dismissBtn}
+              onPress={() => setShowPendingActivationModal(false)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <SmartText variant="body2" style={styles.dismissBtnText}>
+                Got it
+              </SmartText>
+            </TouchableOpacity>
+          </Card>
         </View>
       </Modal>
     </View>
   );
 }
 
-const FONT_SIZE = 14;
-const LINE_HEIGHT = 18;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.paper },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.paper
+  },
 
   header: {
     backgroundColor: colors.background.default,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: responsiveSize.md,
+    paddingBottom: responsiveSize.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...shadows.sm,
+    ...platformStyles.shadowSm,
   },
-  headerContent: { width: '100%' },
-  tabletHeaderContent: { maxWidth: 1200, alignSelf: 'center' },
+  headerContent: {
+    width: '100%'
+  },
+  tabletHeaderContent: {
+    maxWidth: 1200,
+    alignSelf: 'center'
+  },
 
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.md,
   },
-  headerActions: { flexDirection: 'row' },
+  headerActions: {
+    flexDirection: 'row'
+  },
 
   iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: MIN_TOUCH_TARGET / 2,
     position: 'relative',
-    backgroundColor: `${colors.primary.main}10`,
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.1),
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.xs,
-    ...(ANDROID
-      ? {
-          elevation: 0,
-          shadowColor: 'transparent',
-          shadowOpacity: 0,
-          shadowRadius: 0,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: rgbaFromHex(colors.gray[400], 0.35),
-        }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.08,
-          shadowRadius: 2,
-        }),
+    marginLeft: responsiveSize.xs,
+    ...platformStyles.shadowSm,
   },
   badgeOuter: {
     position: 'absolute',
     top: -2,
     right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: moderateScale(14),
+    height: moderateScale(14),
+    borderRadius: moderateScale(7),
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 8,
-    ...(ANDROID
-      ? { elevation: 4, shadowColor: 'transparent' }
-      : { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 1.5 }),
+    ...platformStyles.shadowSm,
   },
   badgeInner: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
+    width: moderateScale(9),
+    height: moderateScale(9),
+    borderRadius: moderateScale(4.5),
     backgroundColor: colors.status.error,
   },
 
-  logo: { width: 120, height: 32 },
-  welcomeSection: { paddingLeft: spacing.xs },
-  greeting: { ...typography.h2, color: colors.text.primary, marginBottom: spacing.xs, fontWeight: '700' },
-  welcomeMessage: { ...typography.body1, color: colors.text.secondary, fontWeight: '400' },
+  logo: {
+    width: moderateScale(120),
+    height: moderateScale(32)
+  },
+  welcomeSection: {
+    paddingLeft: responsiveSize.xs,
+  },
+  welcomeMessage: {
+    color: colors.text.secondary,
+    marginTop: responsiveSize.xs,
+  },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  scroll: {
+    flex: 1
+  },
+  scrollContent: {
+    padding: responsiveSize.md,
+    flexGrow: 1,
+  },
 
-  // Reusable surface
-  cardSurface: ANDROID
-    ? {
-        elevation: 0,
-        shadowColor: 'transparent',
-        shadowOpacity: 0,
-        shadowRadius: 0,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: rgbaFromHex(colors.gray[400], 0.25),
-      }
-    : {},
+  warningBanner: {
+    backgroundColor: `${colors.status.warning}15`,
+    borderRadius: borderRadius.lg,
+    padding: responsiveSize.md,
+    marginBottom: responsiveSize.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.status.warning,
+    ...platformStyles.shadowSm,
+  },
+  warningIconContainer: {
+    backgroundColor: colors.background.default,
+    borderRadius: borderRadius.full,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: responsiveSize.sm,
+  },
+  warningContent: {
+    flex: 1,
+  },
+  warningTitle: {
+    color: colors.status.warning,
+    fontWeight: '700',
+    marginBottom: responsiveSize.xs,
+  },
+  warningMessage: {
+    color: colors.text.primary,
+    lineHeight: 20,
+  },
+  warningLink: {
+    color: colors.primary.main,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
 
-  // Quick actions
-  quickActionsSection: { marginBottom: spacing.xl },
-  tabletQuickActionsSection: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+  quickActionsSection: {
+    marginBottom: responsiveSize.lg
+  },
+  tabletQuickActionsSection: {
+    maxWidth: 900,
+    alignSelf: 'center',
+    width: '100%'
+  },
   quickActionsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    gap: responsiveSize.sm,
+    flexWrap: 'nowrap',
+  },
+  quickActionsGridExtraSmall: {
+    gap: responsiveSize.xs,
   },
   quickActionCard: {
     flex: 1,
-    minWidth: 100,
-    maxWidth: 160,
+    minWidth: moderateScale(90),
+    maxWidth: moderateScale(140),
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    paddingVertical: responsiveSize.md,
+    paddingHorizontal: responsiveSize.sm,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    ...(!ANDROID ? shadows.sm : null),
-    minHeight: 120,
+    justifyContent: 'center',
+    minHeight: moderateScale(92),
+    ...platformStyles.shadowSm,
   },
   quickActionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: responsiveSize.sm,
     backgroundColor: rgbaFromHex(colors.primary.main, 0.08),
   },
   quickActionText: {
-    fontSize: 13,
-    lineHeight: 17,
     fontWeight: '600',
     textAlign: 'center',
     color: colors.text.primary,
-    marginTop: spacing.xs,
+    lineHeight: moderateScale(16),
+    flexShrink: 1,
+    width: '100%',
   },
 
-  // Services
-  servicesSection: { flex: 1 },
-  sectionHeader: { marginBottom: spacing.lg },
-  sectionTitle: { ...typography.h3, color: colors.text.primary, fontWeight: '700', marginBottom: spacing.xs / 2 },
-  sectionSubtitle: { ...typography.body1, color: colors.text.secondary, fontWeight: '400' },
+  servicesSection: {
+    flex: 1
+  },
+  sectionHeader: {
+    marginBottom: responsiveSize.sm,
+    paddingLeft: responsiveSize.xs / 2,
+  },
+  sectionSubtitle: {
+    color: colors.text.secondary,
+    marginTop: responsiveSize.xs,
+  },
 
   servicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: responsiveSize.sm,
   },
   tabletServicesGrid: {
     maxWidth: 900,
@@ -528,59 +727,144 @@ const styles = StyleSheet.create({
 
   serviceCard: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 100,
-    ...(!ANDROID ? shadows.sm : null),
+    minHeight: moderateScale(104),
+    ...platformStyles.shadowSm,
   },
   serviceCardContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: responsiveSize.xs,
+    minWidth: 0,
   },
   serviceIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-    flexShrink: 0,
-  },
-  serviceTextContainer: { flex: 1, minWidth: 0 },
-  serviceTitle: { ...typography.h4, color: colors.text.primary, marginBottom: spacing.xs / 2, fontWeight: '600' },
-  serviceDescription: { ...typography.body2, color: colors.text.secondary, fontWeight: '400', lineHeight: 20 },
-  chevronContainer: {
-    width: 32,
-    height: 32,
+    width: moderateScale(40),
+    height: moderateScale(40),
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: responsiveSize.sm,
+    flexShrink: 0,
+  },
+  serviceTextContainer: {
+    flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
+    justifyContent: 'center',
+  },
+  serviceDescription: {
+    color: colors.text.secondary,
+  },
+  chevronContainer: {
+    width: moderateScale(28),
+    height: moderateScale(28),
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
 
-  // Modal (single action)
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15,15,15,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: responsiveSize.lg,
   },
   modalCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
     width: '100%',
-    maxWidth: 460,
-    ...(!ANDROID ? shadows.lg : null),
+    maxWidth: moderateScale(460),
   },
-  modalTitle: { ...typography.h3, color: colors.text.primary, marginBottom: spacing.sm, fontWeight: '700' as const },
-  modalMessage: { ...typography.body1, color: colors.text.secondary, marginBottom: spacing.lg },
-  modalBtn: { paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center' },
-  confirmBtn: { backgroundColor: colors.primary.main },
-  confirmBtnText: { ...typography.body1, fontWeight: '700' as const, color: colors.background.default },
+  modalTitle: {
+    color: colors.text.primary,
+    marginBottom: responsiveSize.sm,
+  },
+  modalMessage: {
+    color: colors.text.secondary,
+    marginBottom: responsiveSize.lg,
+  },
+  confirmBtn: {
+    paddingVertical: responsiveSize.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    backgroundColor: colors.primary.main,
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    fontWeight: '700',
+    color: colors.background.default
+  },
+  dismissBtn: {
+    paddingVertical: responsiveSize.sm,
+    alignItems: 'center',
+    marginTop: responsiveSize.sm,
+  },
+  dismissBtnText: {
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  pendingActivationIcon: {
+    alignItems: 'center',
+    marginBottom: responsiveSize.md,
+  },
+  pendingActivationTitle: {
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: responsiveSize.lg,
+  },
+  dateHighlight: {
+    color: colors.primary.main,
+    fontWeight: '700',
+  },
+  activationDateContainer: {
+    backgroundColor: colors.gray[50],
+    borderRadius: borderRadius.lg,
+    padding: responsiveSize.lg,
+    marginBottom: responsiveSize.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary.light,
+  },
+  activationDateLabel: {
+    color: colors.text.secondary,
+    marginBottom: responsiveSize.xs,
+    textAlign: 'center',
+  },
+  activationDate: {
+    color: colors.primary.main,
+    fontWeight: '700',
+    marginBottom: responsiveSize.xs,
+    textAlign: 'center',
+  },
+  daysUntilActive: {
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  modalMessageSecondary: {
+    color: colors.text.secondary,
+    marginBottom: responsiveSize.xl,
+    textAlign: 'center',
+  },
+  secondaryBtn: {
+    paddingVertical: responsiveSize.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    backgroundColor: colors.background.paper,
+    borderWidth: 1,
+    borderColor: colors.primary.main,
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: 'center',
+    marginTop: responsiveSize.sm,
+  },
+  secondaryBtnText: {
+    fontWeight: '600',
+    color: colors.primary.main,
+  },
 });

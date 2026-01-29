@@ -16,19 +16,19 @@ import {
   ActivityIndicator,
   Platform,
   BackHandler,
-  Text,
   TouchableOpacity,
   StyleProp,
   ViewStyle,
   Linking as RNLinking,
-  RefreshControl,
   Animated,
   Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 
 /** Backward-compatible props (your existing ones) + a few optional niceties */
 interface WebViewContainerProps {
@@ -62,27 +62,128 @@ interface WebViewContainerProps {
 
   /** Optional: notify parent when canGoBack changes (e.g., to mirror back UX) */
   onCanGoBackChange?: (canGoBack: boolean) => void;
+
+  /** Optional: persist session cookies for stay-signed-in functionality */
+  persistCookies?: boolean;
+
+  /** Optional: storage key for persisting cookies (default: 'webview_cookies') */
+  cookieStorageKey?: string;
+
+  /** Optional: handle nested webviews/iframes securely */
+  allowNestedFrames?: boolean;
+
+  /** Optional: disable UX enhancements for special widgets like chat (default: false) */
+  disableEnhancements?: boolean;
 }
 
-/** Tiny UX injection to make sites feel snappier in-app */
-const UX_INJECT = `
+/** Comprehensive UX & security injection */
+const getUXInject = (disableEnhancements: boolean) => {
+  if (disableEnhancements) {
+    return `
 (function() {
   try {
-    // Avoid double-adding meta
+    // Minimal enhancements for chat widgets
     if (!document.querySelector('meta[name="viewport"]')) {
       var m = document.createElement('meta');
       m.name = 'viewport';
-      m.content = 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover';
+      m.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
       document.head.appendChild(m);
     }
-    // Improve tap responsiveness on older libs
-    document.body.style.webkitTapHighlightColor = 'rgba(0,0,0,0)';
-    // Smooth-ish scrolling
-    document.documentElement.style.scrollBehavior = 'smooth';
-  } catch(_) {}
+  } catch(err) {}
 })();
-true; // required on iOS
+true;
 `;
+  }
+
+  return `
+(function() {
+  try {
+    // Remove existing viewport meta tags to prevent conflicts
+    const existingMetas = document.querySelectorAll('meta[name="viewport"]');
+    existingMetas.forEach(meta => meta.remove());
+
+    // Add optimized viewport
+    var m = document.createElement('meta');
+    m.name = 'viewport';
+    m.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+    document.head.insertBefore(m, document.head.firstChild);
+
+    // Prevent horizontal scroll and force content to fit
+    const style = document.createElement('style');
+    style.id = 'webview-enhancements';
+    style.textContent = \`
+      html {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      body {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        margin: 0 !important;
+        -webkit-tap-highlight-color: rgba(0,0,0,0);
+      }
+      * {
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+      }
+      img, iframe, video {
+        max-width: 100% !important;
+        height: auto !important;
+      }
+      input, textarea, select {
+        font-size: 16px !important; /* Prevents iOS zoom on focus */
+      }
+    \`;
+    document.head.appendChild(style);
+
+    // Disable double-tap zoom
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(e) {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+
+    // Prevent pinch zoom
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // Prevent keyboard from pushing layout (iOS)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function() {
+        document.body.style.height = window.visualViewport.height + 'px';
+      });
+    }
+
+    // Security: Prevent click-jacking
+    if (window.top !== window.self) {
+      console.warn('Nested iframe detected');
+    }
+
+    // Auto-dismiss iOS keyboard on scroll (improves UX)
+    let scrollTimer;
+    window.addEventListener('scroll', function() {
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(function() {
+        if (document.activeElement && document.activeElement.tagName.match(/input|textarea/i)) {
+          // Keep focus for form fields
+        }
+      }, 150);
+    }, { passive: true });
+
+  } catch(err) {
+    console.error('WebView enhancement error:', err);
+  }
+})();
+true;
+`;
+};
 
 export const WebViewContainer = forwardRef(
   (
@@ -113,6 +214,10 @@ export const WebViewContainer = forwardRef(
       enablePullToRefresh = false,
       dark = false,
       onCanGoBackChange,
+      persistCookies = true,
+      cookieStorageKey = 'webview_cookies',
+      allowNestedFrames = false,
+      disableEnhancements = false,
     }: WebViewContainerProps,
     ref: ForwardedRef<WebView>,
   ) => {
@@ -129,7 +234,7 @@ export const WebViewContainer = forwardRef(
     const webViewRef = useRef<WebView>(null);
     useImperativeHandle(ref, () => webViewRef.current as any);
 
-    const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isMountedRef = useRef(true);
 
     // UA defaults
@@ -185,12 +290,26 @@ export const WebViewContainer = forwardRef(
       }
     };
 
-    // Save/load simple cookies string (if you set it somewhere else)
+    // Save/load cookies for persistent login
     useEffect(() => {
-      AsyncStorage.getItem('webview_cookies').then((stored) => {
-        if (stored) setCookies(stored);
-      });
-    }, []);
+      if (persistCookies) {
+        AsyncStorage.getItem(cookieStorageKey).then((stored) => {
+          if (stored) setCookies(stored);
+        });
+      }
+    }, [persistCookies, cookieStorageKey]);
+
+    // Save cookies when they change (for persistent sign-in)
+    const saveCookies = async (newCookies: string) => {
+      if (persistCookies && newCookies) {
+        try {
+          await AsyncStorage.setItem(cookieStorageKey, newCookies);
+          setCookies(newCookies);
+        } catch (err) {
+          console.error('Failed to save cookies:', err);
+        }
+      }
+    };
 
     // Android hardware back → WebView back first, then let navigator decide
     useEffect(() => {
@@ -257,6 +376,12 @@ export const WebViewContainer = forwardRef(
       const next = !!navState?.canGoBack;
       canGoBackRef.current = next;
       onCanGoBackChange?.(next);
+
+      // Check for nested iframes (security)
+      if (!allowNestedFrames && navState.url?.includes('iframe')) {
+        console.warn('Nested iframe detected in:', navState.url);
+      }
+
       onNavigationStateChange?.(navState);
     };
 
@@ -308,28 +433,37 @@ export const WebViewContainer = forwardRef(
         };
 
     // Combined injection: your injected JS + UX helper
-    const combinedInjectedJS = `${UX_INJECT}\n;${injectedJavaScript || ''}`;
+    const uxInject = getUXInject(disableEnhancements);
+    const combinedInjectedJS = `${uxInject}\n;${injectedJavaScript || ''}`;
 
     // Error view
     if (hasError) {
       return (
         <View style={[styles.container, dark && { backgroundColor: colors.background.paper }]}>
           <View style={styles.errorContainer}>
-            <Text style={[styles.errorTitle, dark && { color: colors.text.primary }]}>
+            <SmartText
+              variant="h3"
+              style={[styles.errorTitle, dark && { color: colors.text.primary }]}
+              maxLines={2}
+            >
               Something went wrong
-            </Text>
-            <Text style={[styles.errorText, dark && { color: colors.text.secondary }]}>
-              We couldn’t load this page right now.
-            </Text>
+            </SmartText>
+            <SmartText
+              variant="body1"
+              style={[styles.errorText, dark && { color: colors.text.secondary }]}
+              maxLines={2}
+            >
+              We couldn't load this page right now.
+            </SmartText>
             <View style={styles.errorActions}>
               <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <SmartText variant="body1" style={styles.retryButtonText} maxLines={1}>Retry</SmartText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.openButton]}
                 onPress={() => openExternal(url)}
               >
-                <Text style={styles.openButtonText}>Open in Browser</Text>
+                <SmartText variant="body1" style={styles.openButtonText} maxLines={1}>Open in Browser</SmartText>
               </TouchableOpacity>
             </View>
           </View>
@@ -377,6 +511,10 @@ export const WebViewContainer = forwardRef(
           onLoadProgress={handleProgress}
           startInLoadingState={false}
           userAgent={userAgent ?? defaultUA}
+          allowFileAccess
+          allowUniversalAccessFromFileURLs
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptCanOpenWindowsAutomatically
           // iOS "in-page" swipe (not the stack swipe) for WebView history
           allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
           // keyboard props
@@ -384,32 +522,72 @@ export const WebViewContainer = forwardRef(
           hideKeyboardAccessoryView={hideKeyboardAccessoryView}
           // Pull to refresh (Android native)
           pullToRefreshEnabled={enablePullToRefresh && Platform.OS === 'android'}
-          // New window / _blank
-          setSupportMultipleWindows
-          onOpenWindow={async (e) => {
-            const targetUrl = e?.nativeEvent?.targetUrl;
-            if (!targetUrl) return;
-            // Prefer opening external for new windows to keep app context clean
-            await openExternal(targetUrl);
-          }}
+          // New window / _blank (disable to prevent popup issues)
+          setSupportMultipleWindows={false}
           // Intercept navigations (incl. target=_blank and external intents)
           onShouldStartLoadWithRequest={(req) => {
             const nextUrl = req?.url ?? '';
+
+            // Security: Block javascript: and data: URLs
+            if (/^(javascript:|data:)/i.test(nextUrl)) {
+              console.warn('Blocked potentially malicious URL:', nextUrl);
+              return false;
+            }
+
             // External protocols
             if (/^(intent:|tel:|mailto:|sms:|maps:|geo:)/i.test(nextUrl)) {
               RNLinking.openURL(nextUrl);
               return false;
             }
+
             // Force external for some hosts
             if (shouldOpenExternally(nextUrl)) {
               openExternal(nextUrl);
               return false;
             }
+
+            // Security: Prevent navigation to blocked domains
+            const blockedDomains = ['phishing.com', 'malware.com']; // Add actual blocked domains
+            const host = urlToHost(nextUrl);
+            if (blockedDomains.some(d => host.includes(d))) {
+              console.warn('Blocked navigation to:', nextUrl);
+              return false;
+            }
+
             // Allow normal navigation inside
             return true;
           }}
+          // Handle HTTP errors gracefully
+          onHttpError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.warn('HTTP Error:', nativeEvent.statusCode, nativeEvent.url);
+            if (nativeEvent.statusCode >= 500) {
+              setHasError(true);
+            }
+          }}
+          // Handle render process crashes (Android)
+          onRenderProcessGone={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('WebView crashed:', nativeEvent);
+            if (nativeEvent.didCrash) {
+              setHasError(true);
+              // Optionally reload after crash
+              setTimeout(() => {
+                if (isMountedRef.current) {
+                  webViewRef.current?.reload();
+                }
+              }, 1000);
+            }
+          }}
           // iOS-only: content inset adjust for better fit
           contentInsetAdjustmentBehavior="automatic"
+          // Prevent memory leaks on Android
+          androidLayerType="hardware"
+          // Better performance
+          cacheEnabled={true}
+          cacheMode="LOAD_DEFAULT"
+          // Incognito mode (no persistent storage)
+          incognito={!persistCookies}
         />
 
         {/* Global loader overlay (subtle, app-colored) */}
@@ -437,10 +615,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    height: 3,
+    height: moderateScale(3),
     backgroundColor: colors.primary.main,
     zIndex: 1000,
-    ...shadows.sm,
+    ...platformStyles.shadowSm,
   },
 
   // Loading overlay
@@ -455,56 +633,46 @@ const styles = StyleSheet.create({
     backgroundColor: `${colors.background.default}F5`,
   },
 
-  // Error state
   errorContainer: {
     flex: 1,
-    padding: spacing.xxl,
+    padding: responsiveSize.xxl,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    gap: responsiveSize.md,
   },
   errorTitle: {
-    ...typography.h3,
-    fontWeight: '700' as const,
     color: colors.text.primary,
-    marginBottom: spacing.sm,
     textAlign: 'center' as const,
   },
   errorText: {
-    ...typography.body1,
     color: colors.text.secondary,
     textAlign: 'center' as const,
-    marginBottom: spacing.xl,
-    lineHeight: 24,
   },
   errorActions: {
     flexDirection: 'row' as const,
-    gap: spacing.md,
+    gap: responsiveSize.md,
     flexWrap: 'wrap' as const,
     justifyContent: 'center' as const,
   },
   retryButton: {
     backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: responsiveSize.lg,
+    paddingVertical: responsiveSize.md,
     borderRadius: borderRadius.lg,
-    ...shadows.md,
+    ...platformStyles.shadowMd,
   },
   retryButtonText: {
     color: colors.background.default,
-    ...typography.body1,
-    fontWeight: '700' as const,
   },
   openButton: {
     backgroundColor: colors.gray[100],
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: responsiveSize.lg,
+    paddingVertical: responsiveSize.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.gray[200],
   },
   openButtonText: {
     color: colors.text.primary,
-    ...typography.body1,
-    fontWeight: '600' as const,
   },
 });

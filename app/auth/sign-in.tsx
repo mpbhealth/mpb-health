@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -26,13 +25,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedView = Animated.createAnimatedComponent(View);
 const logoImg = require('../../assets/images/logo.png');
-
-const MAX_ATTEMPTS = 6; // after first failure user will see "you have 5 more attempts"
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -111,21 +110,22 @@ export default function SignInScreen() {
 
   const ActivationMessage = ({ note }: { note?: string }) => (
     <View style={styles.errorContent}>
-      <AlertCircle size={20} color={colors.status.error} />
-      <Text style={styles.errorText}>
+      <AlertCircle size={moderateScale(18)} color={colors.status.error} />
+      <SmartText variant="body2" style={styles.errorText}>
         {note ?? 'App login required. Please create your app login to continue.'}{' '}
-        <Text
+        <SmartText
+          variant="body2"
           style={styles.link}
           onPress={() => router.push({ pathname: '/auth/sign-up', params: { email } } as any)}
         >
           Create App Login
-        </Text>
+        </SmartText>
         {'  '}•{'  '}
-        <Text style={styles.link} onPress={() => router.push('/auth/member-support')}>
+        <SmartText variant="body2" style={styles.link} onPress={() => router.push('/auth/member-support')}>
           Contact Concierge
-        </Text>
+        </SmartText>
         .
-      </Text>
+      </SmartText>
     </View>
   );
 
@@ -141,116 +141,122 @@ export default function SignInScreen() {
     }
 
     setIsLoading(true);
-    // flags used across try/catch
-    let inMembers = false;
-    let inUsers = false;
 
     try {
-      // --- Pre-checks: does email exist in members? users? ---
-      const [membersQ, usersQ] = await Promise.all([
-        supabase.from('members').select('email').eq('email', email).maybeSingle(),
-        supabase.from('users').select('email').eq('email', email).maybeSingle(),
-      ]);
+      // Check if email exists in members table
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
 
-      if (membersQ.error) console.warn('members lookup:', membersQ.error.message);
-      if (usersQ.error) console.warn('users lookup:', usersQ.error.message);
+      // Check if email exists in users table (app login created)
+      const { data: userData } = await supabase
+        .from('users')
+        .select('email, inactive_date, active_date')
+        .eq('email', email)
+        .maybeSingle();
 
-      inMembers = !!membersQ.data;
-      inUsers = !!usersQ.data;
-
-      // 1) Email in MEMBERS but NOT in USERS -> must create app login
-      if (inMembers && !inUsers) {
-        setError(<ActivationMessage />);
+      // Scenario 1: Member exists but no app login created
+      if (memberData && !userData) {
+        setError(
+          <View style={styles.errorContent}>
+            <AlertCircle size={moderateScale(18)} color={colors.status.error} />
+            <SmartText variant="body2" style={styles.errorText}>
+              You're an MPB Health member, but you haven't created your app login yet.{' '}
+              <SmartText
+                variant="body2"
+                style={styles.link}
+                onPress={() => router.push({ pathname: '/auth/sign-up', params: { email } } as any)}
+              >
+                Create App Login
+              </SmartText>
+              {' '}to access your dashboard. Need help?{' '}
+              <SmartText variant="body2" style={styles.link} onPress={() => router.push('/auth/member-support')}>
+                Contact Concierge
+              </SmartText>
+            </SmartText>
+          </View>
+        );
         AccessibilityInfo.announceForAccessibility?.('App login required');
         return;
       }
 
-      // 3) Email in NEITHER members nor users -> email likely wrong / not on file
-      if (!inMembers && !inUsers) {
+      // Scenario 2: Email doesn't exist in either table
+      if (!memberData && !userData) {
         setError(
           <View style={styles.errorContent}>
-            <AlertCircle size={20} color={colors.status.error} />
-            <Text style={styles.errorText}>
-              Please double-check your email. If you have an active membership but can’t create your
-              app login,{' '}
-              <Text style={styles.link} onPress={() => router.push('/auth/member-support')}>
+            <AlertCircle size={moderateScale(18)} color={colors.status.error} />
+            <SmartText variant="body2" style={styles.errorText}>
+              We couldn't find this email in our system. Please double-check your email or{' '}
+              <SmartText variant="body2" style={styles.link} onPress={() => router.push('/auth/member-support')}>
                 contact our Concierge
-              </Text>{' '}
-              and we’ll help you get set up.
-            </Text>
+              </SmartText>
+              {' '}if you need assistance with your membership.
+            </SmartText>
           </View>
         );
         AccessibilityInfo.announceForAccessibility?.('Email not found');
         return;
       }
 
-      // Otherwise, try password sign-in
-      await signIn({ email, password });
+      // Scenario 3: Check if member is inactive
+      if (userData?.inactive_date) {
+        const inactiveDate = new Date(userData.inactive_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        inactiveDate.setHours(0, 0, 0, 0);
 
-      // Optional post-auth policy (kept from your original code)
-      try {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('is_primary, dob, first_name, last_name')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (userData?.is_primary && userData?.dob) {
-          const birthDate = new Date(userData.dob);
-          const today = new Date();
-          let age = today.getFullYear() - birthDate.getFullYear();
-          const monthDiff = today.getMonth() - birthDate.getMonth();
-          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
-          if (age > 65) {
-            await supabase.auth.signOut();
-            setFailedCount((c) => c + 1);
-            setError(
-              `Hello ${userData.first_name ?? ''} ${userData.last_name ?? ''}, you have aged out of your current plan. Please contact our Concierge team for assistance with alternative coverage options.`
-            );
-            return;
-          }
+        if (inactiveDate <= today) {
+          setError(
+            <View style={styles.errorContent}>
+              <AlertCircle size={moderateScale(18)} color={colors.status.error} />
+              <SmartText variant="body2" style={styles.errorText}>
+                We miss you! Your membership is currently inactive. We'd love to have you back!{' '}
+                <SmartText variant="body2" style={styles.link} onPress={() => router.push('/auth/member-support')}>
+                  Contact our Concierge
+                </SmartText>
+                {' '}to reactivate your account and continue your health journey with us.
+              </SmartText>
+            </View>
+          );
+          AccessibilityInfo.announceForAccessibility?.('Membership inactive');
+          return;
         }
-      } catch (e) {
-        console.warn('Post-auth policy check failed (non-blocking).', e);
       }
+
+      // Scenario 4: App login exists, attempt sign-in
+      await signIn({ email, password });
 
       await new Promise((r) => setTimeout(r, 150));
       router.push('/(tabs)' as any);
     } catch (err: any) {
-      // Tailored wrong-password message if the email is in USERS (case 2)
       const msg = (err?.message || '').toLowerCase();
       const invalidCreds =
         msg.includes('invalid login credentials') || msg.includes('invalid_credentials');
 
-      setFailedCount((c) => {
-        const next = c + 1;
+      setFailedCount((c) => c + 1);
 
-        if (inUsers && invalidCreds) {
-          const remaining = Math.max(0, MAX_ATTEMPTS - next);
-          setError(
-            <View style={styles.errorContent}>
-              <AlertCircle size={20} color={colors.status.error} />
-              <Text style={styles.errorText}>
-                The password is incorrect. You have {remaining} more attempt{remaining === 1 ? '' : 's'}.
-                {'  '}
-                <Text style={styles.link} onPress={() => router.push('/auth/forgot-password')}>
-                  Reset password
-                </Text>
-                .
-              </Text>
-            </View>
-          );
-        } else if (inMembers && !inUsers) {
-          // Safety net: if signIn threw but user needs to create login, show that flow
-          setError(<ActivationMessage />);
-        } else {
-          // Generic fallback
-          setError(normalizeSupabaseError(err?.message || ''));
-        }
+      // Scenario 5: Correct email but wrong password
+      if (invalidCreds) {
+        setError(
+          <View style={styles.errorContent}>
+            <AlertCircle size={moderateScale(18)} color={colors.status.error} />
+            <SmartText variant="body2" style={styles.errorText}>
+              The password you entered is incorrect.{' '}
+              <SmartText variant="body2" style={styles.link} onPress={() => router.push('/auth/forgot-password')}>
+                Reset password
+              </SmartText>
+              {' '}or try again.
+            </SmartText>
+          </View>
+        );
+      } else {
+        // Scenario 6: Other errors (network, rate limit, etc.)
+        setError(normalizeSupabaseError(err?.message || ''));
+      }
 
-        AccessibilityInfo.announceForAccessibility?.('Sign-in failed');
-        return next;
-      });
+      AccessibilityInfo.announceForAccessibility?.('Sign-in failed');
     } finally {
       setIsLoading(false);
     }
@@ -269,7 +275,7 @@ export default function SignInScreen() {
         <AnimatedView style={[styles.content, contentStyle]}>
           <Animated.View style={[styles.logoContainer, logoStyle]} entering={FadeInDown.delay(100)}>
             <Image source={logoImg} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.welcomeTitle}>Welcome Back</Text>
+            <SmartText variant="h2" style={styles.welcomeTitle}>Welcome Back</SmartText>
           </Animated.View>
 
           <AnimatedTouchableOpacity
@@ -277,32 +283,32 @@ export default function SignInScreen() {
             entering={FadeInDown.delay(180)}
             activeOpacity={1}
           >
-            <Text style={styles.welcomeText}>
+            <SmartText variant="body1" style={styles.welcomeText}>
               Sign in to access your MPB Health dashboard
-            </Text>
+            </SmartText>
 
             {/* Errors / Notices */}
             {error && (
               <View style={styles.errorContainer}>
                 {typeof error === 'string' ? (
                   <View style={styles.errorContent}>
-                    <AlertCircle size={20} color={colors.status.error} />
-                    <Text style={styles.errorText}>{error}</Text>
+                    <AlertCircle size={moderateScale(18)} color={colors.status.error} />
+                    <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
                   </View>
                 ) : (
                   error
                 )}
                 {showCapsHint && (
-                  <Text style={styles.hintText}>
+                  <SmartText variant="caption" style={styles.hintText}>
                     Having trouble? Check Caps Lock or try revealing your password.
-                  </Text>
+                  </SmartText>
                 )}
               </View>
             )}
 
             {/* Email */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <SmartText variant="body2" style={styles.label}>Email</SmartText>
               <TextInput
                 ref={emailRef}
                 style={[styles.input, fieldError.email ? styles.inputError : null]}
@@ -323,13 +329,13 @@ export default function SignInScreen() {
                 accessibilityLabel="Email"
               />
               {!!fieldError.email && (
-                <Text style={styles.fieldErrorText}>{fieldError.email}</Text>
+                <SmartText variant="caption" style={styles.fieldErrorText}>{fieldError.email}</SmartText>
               )}
             </View>
 
             {/* Password */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
+              <SmartText variant="body2" style={styles.label}>Password</SmartText>
               <View
                 style={[
                   styles.passwordContainer,
@@ -362,14 +368,14 @@ export default function SignInScreen() {
                   accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
-                    <EyeOff size={20} color={colors.text.secondary} />
+                    <EyeOff size={moderateScale(18)} color={colors.text.secondary} />
                   ) : (
-                    <Eye size={20} color={colors.text.secondary} />
+                    <Eye size={moderateScale(18)} color={colors.text.secondary} />
                   )}
                 </TouchableOpacity>
               </View>
               {!!fieldError.password && (
-                <Text style={styles.fieldErrorText}>{fieldError.password}</Text>
+                <SmartText variant="caption" style={styles.fieldErrorText}>{fieldError.password}</SmartText>
               )}
             </View>
 
@@ -378,7 +384,7 @@ export default function SignInScreen() {
               onPress={() => router.push('/auth/forgot-password')}
               style={styles.forgotPasswordButton}
             >
-              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              <SmartText variant="body2" style={styles.forgotPasswordText}>Forgot password?</SmartText>
             </TouchableOpacity>
 
             {/* Password sign-in */}
@@ -390,9 +396,9 @@ export default function SignInScreen() {
               layout={Layout.springify()}
               accessibilityRole="button"
             >
-              <Text style={styles.signInButtonText}>
+              <SmartText variant="body1" style={styles.signInButtonText}>
                 {isLoading ? 'Signing in…' : 'Sign In'}
-              </Text>
+              </SmartText>
             </AnimatedTouchableOpacity>
 
             {/* Sign up / Create login */}
@@ -400,9 +406,9 @@ export default function SignInScreen() {
               style={styles.signUpContainer}
               onPress={() => router.push('/auth/sign-up')}
             >
-              <Text style={styles.signUpText}>
-                New here? <Text style={styles.signUpLink}>Create App Login</Text>
-              </Text>
+              <SmartText variant="body2" style={styles.signUpText}>
+                New here? <SmartText variant="body2" style={styles.signUpLink}>Create App Login</SmartText>
+              </SmartText>
             </TouchableOpacity>
           </AnimatedTouchableOpacity>
         </AnimatedView>
@@ -416,62 +422,60 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   content: { alignSelf: 'center', width: '100%', maxWidth: 400 },
 
-  logoContainer: { alignItems: 'center', marginBottom: spacing.xxl },
-  logo: { width: 180, height: 48, marginBottom: spacing.md },
+  logoContainer: { alignItems: 'center', marginBottom: responsiveSize.xl },
+  logo: { width: moderateScale(160), height: moderateScale(42), marginBottom: responsiveSize.sm },
   welcomeTitle: {
-    ...typography.h2,
+    fontWeight: '700',
     color: colors.text.primary,
-    fontWeight: '700' as const,
-    textAlign: 'center' as const,
+    textAlign: 'center',
   },
 
   formContainer: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
-    ...shadows.lg,
+    borderRadius: borderRadius.lg,
+    padding: responsiveSize.lg,
+    ...platformStyles.shadow,
     borderWidth: 1,
     borderColor: colors.gray[100],
   },
 
   welcomeText: {
-    ...typography.body1,
     color: colors.text.secondary,
-    textAlign: 'center' as const,
-    marginBottom: spacing.xl,
-    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: responsiveSize.lg,
   },
 
   errorContainer: {
     backgroundColor: `${colors.status.error}10`,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.lg,
+    padding: responsiveSize.sm,
+    borderRadius: borderRadius.md,
+    marginBottom: responsiveSize.md,
+    overflow: 'hidden',
   },
-  errorContent: { flexDirection: 'row', alignItems: 'center' },
-  errorText: { ...typography.body2, color: colors.status.error, marginLeft: spacing.sm, flex: 1 },
-  hintText: { marginTop: spacing.xs, ...typography.caption, color: colors.text.secondary },
+  errorContent: { flexDirection: 'row', alignItems: 'center', overflow: 'hidden', gap: responsiveSize.xs },
+  errorText: { color: colors.status.error, flex: 1 },
+  hintText: { marginTop: responsiveSize.xs, color: colors.text.secondary },
 
   link: { color: colors.primary.main, textDecorationLine: 'underline' },
 
-  inputContainer: { marginBottom: spacing.lg },
-  label: { ...typography.body2, fontWeight: '600' as const, color: colors.text.primary, marginBottom: spacing.xs },
+  inputContainer: { marginBottom: responsiveSize.md },
+  label: { fontWeight: '600', color: colors.text.primary, marginBottom: responsiveSize.xs },
   input: {
     backgroundColor: colors.background.paper,
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    ...typography.body1,
+    borderRadius: borderRadius.md,
+    padding: responsiveSize.sm,
+    fontSize: moderateScale(15),
     color: colors.text.primary,
   },
   inputError: { borderColor: colors.status.error },
-  fieldErrorText: { color: colors.status.error, ...typography.caption, marginTop: spacing.xs },
+  fieldErrorText: { color: colors.status.error, marginTop: responsiveSize.xs },
 
   passwordContainer: {
     flexDirection: 'row',
@@ -479,26 +483,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.paper,
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.md,
   },
-  passwordInput: { flex: 1, padding: spacing.md, ...typography.body1, color: colors.text.primary },
-  eyeButton: { padding: spacing.md },
+  passwordInput: { flex: 1, padding: responsiveSize.sm, fontSize: moderateScale(15), color: colors.text.primary },
+  eyeButton: { padding: responsiveSize.sm },
 
-  forgotPasswordButton: { alignSelf: 'flex-end', marginBottom: spacing.lg },
-  forgotPasswordText: { color: colors.primary.main, ...typography.body2, fontWeight: '500' },
+  forgotPasswordButton: { alignSelf: 'flex-end', marginBottom: responsiveSize.md },
+  forgotPasswordText: { color: colors.primary.main, fontWeight: '500' },
 
   signInButton: {
     backgroundColor: colors.primary.main,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    padding: responsiveSize.sm,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    ...shadows.md,
+    marginBottom: responsiveSize.xs,
+    ...platformStyles.shadow,
   },
   signInButtonDisabled: { opacity: 0.7 },
-  signInButtonText: { color: colors.background.default, ...typography.body1, fontWeight: '600' },
+  signInButtonText: { color: colors.background.default, fontWeight: '600' },
 
   signUpContainer: { alignItems: 'center' },
-  signUpText: { ...typography.body2, color: colors.text.secondary },
+  signUpText: { color: colors.text.secondary },
   signUpLink: { color: colors.primary.main, fontWeight: '600' },
 });

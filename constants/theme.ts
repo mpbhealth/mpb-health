@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { normalize, getLineHeight, responsiveSpacing } from '@/utils/responsive';
 
 export const colors = {
   // Brand Colors
@@ -52,14 +53,7 @@ export const edgeToEdge = {
   }
 };
 
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 40
-};
+export const spacing = responsiveSpacing;
 
 export const borderRadius = {
   xs: 4,
@@ -96,38 +90,38 @@ export const shadows = {
 
 export const typography = {
   h1: {
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: normalize(32),
+    lineHeight: getLineHeight(normalize(32), 1.25),
     fontWeight: '700' as const
   },
   h2: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: normalize(24),
+    lineHeight: getLineHeight(normalize(24), 1.33),
     fontWeight: '700' as const
   },
   h3: {
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: normalize(20),
+    lineHeight: getLineHeight(normalize(20), 1.4),
     fontWeight: '600' as const
   },
   h4: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: normalize(18),
+    lineHeight: getLineHeight(normalize(18), 1.33),
     fontWeight: '600' as const
   },
   body1: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: normalize(16),
+    lineHeight: getLineHeight(normalize(16), 1.5),
     fontWeight: '400' as const
   },
   body2: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: normalize(14),
+    lineHeight: getLineHeight(normalize(14), 1.43),
     fontWeight: '400' as const
   },
   caption: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: normalize(12),
+    lineHeight: getLineHeight(normalize(12), 1.33),
     fontWeight: '400' as const
   }
 };

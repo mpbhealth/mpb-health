@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Platform, SafeAreaView, Text, Alert } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, Platform, SafeAreaView, Text, Alert, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { Wallet } from 'lucide-react-native';
@@ -17,27 +17,30 @@ export default function HealthWalletScreen() {
   const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
   const [currentUrl, setCurrentUrl] = useState('');
 
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBackPress();
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, [webViewCanGoBack, currentUrl]);
+
   if (loading) {
     return <LoadingIndicator />;
   }
 
   const handleBackPress = () => {
-    // If we're on the landing or login page, exit directly to the app
-    if (currentUrl.includes('/landing') || currentUrl.includes('/login')) {
-      router.back();
-      return;
-    }
-    
-    // For all other pages, if WebView can go back, navigate back within WebView
-    if (webViewCanGoBack && webViewRef.current) {
+    // For all pages except landing/login, if WebView can go back, navigate back within WebView
+    if (webViewCanGoBack && webViewRef.current && !currentUrl.includes('/landing') && !currentUrl.includes('/login')) {
       webViewRef.current.goBack();
       return;
     }
 
-    // If WebView cannot go back, show exit confirmation
+    // Show exit confirmation for landing/login pages or when WebView cannot go back
     Alert.alert(
-      'Exit Health Wallet',
-      'Are you sure you want to exit the Health Wallet?',
+      'Exit HealthWallet',
+      'Are you sure you want to exit HealthWallet?',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Exit', style: 'destructive', onPress: () => router.back() }
@@ -60,7 +63,7 @@ export default function HealthWalletScreen() {
         <View style={styles.titleContainer}>
           <Wallet size={24} color={colors.primary.main} style={styles.titleIcon} />
           <View style={styles.titleTextContainer}>
-            <Text style={styles.title}>Health Wallet</Text>
+            <Text style={styles.title}>HealthWallet</Text>
             <Text style={styles.memberIdInTitle}>ID: {userData?.member_id}</Text>
           </View>
         </View>

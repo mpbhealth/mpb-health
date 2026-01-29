@@ -1,27 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Platform,
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
-  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mail, AlertCircle, Eye, EyeOff } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { supabase } from '@/lib/supabase';
 import { useUserData } from '@/hooks/useUserData';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-// Helper to convert HEX → RGBA
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
   const int = parseInt(clean, 16);
@@ -33,26 +33,15 @@ function rgbaFromHex(hex: string, alpha: number) {
 
 export default function ChangeEmailScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const { userData } = useUserData();
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [success, setSuccess] = useState(false);
   const [showUpdateMembership, setShowUpdateMembership] = useState(false);
-
-  // Check for success parameter from email confirmation
-  useEffect(() => {
-    const checkForSuccess = async () => {
-      const url = await Linking.getInitialURL();
-      if (url && url.includes('email-change-success=true')) {
-        setSuccess(true);
-      }
-    };
-    checkForSuccess();
-  }, []);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,17 +55,14 @@ export default function ChangeEmailScreen() {
     try {
       setError(null);
 
-      // Normalize new email to lowercase
       const normalizedNewEmail = newEmail.trim().toLowerCase();
 
-      // Validate email
       const emailError = validateEmail(normalizedNewEmail);
       if (emailError) {
         setError(emailError);
         return;
       }
 
-      // Validate password
       if (!password) {
         setError('Password is required to confirm this change');
         return;
@@ -84,31 +70,37 @@ export default function ChangeEmailScreen() {
 
       setIsLoading(true);
 
-      // Re-authenticate by signing in with current credentials (using normalized email)
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: (userData?.email || '').toLowerCase(),
-        password,
-      });
-
-      if (signInError) {
-        setError('Invalid password. Please try again.');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('Session expired. Please sign in again.');
         return;
       }
 
-      // Update email in auth with normalized email
-      const { error: updateError } = await supabase.auth.updateUser({
-        email: normalizedNewEmail,
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/update-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          newEmail: normalizedNewEmail,
+          currentPassword: password,
+        }),
       });
 
-      if (updateError) {
-        setError(updateError.message);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to update email');
         return;
       }
 
-      // Show email sent confirmation
-      setEmailSent(true);
+      setSuccess(true);
       setNewEmail('');
       setPassword('');
+
+      await supabase.auth.refreshSession();
     } catch (err) {
       console.error(err);
       setError('An unexpected error occurred');
@@ -123,7 +115,7 @@ export default function ChangeEmailScreen() {
         <View style={styles.header}>
           <BackButton onPress={() => setShowUpdateMembership(false)} />
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Update Membership</Text>
+            <SmartText variant="h3" style={styles.headerTitle}>Update Membership</SmartText>
           </View>
         </View>
         <WebViewContainer url="https://www.cognitoforms.com/MPoweringBenefits1/MemberUpdates" />
@@ -135,7 +127,7 @@ export default function ChangeEmailScreen() {
     <View style={styles.container}>
       <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Change Email</Text>
+        <SmartText variant="h2" style={styles.title}>Change Email</SmartText>
       </Animated.View>
 
       <ScrollView
@@ -143,281 +135,318 @@ export default function ChangeEmailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Animated.View style={styles.currentEmailCard} entering={FadeInUp.delay(200)}>
-          <View style={styles.iconContainer}>
-            <Mail size={24} color={colors.primary.main} />
-          </View>
-          <View>
-            <Text style={styles.label}>Current Email</Text>
-            <Text style={styles.currentEmail}>{userData?.email}</Text>
-          </View>
-        </Animated.View>
-
-        <Animated.View style={styles.warningCard} entering={FadeInUp.delay(250)}>
-          <AlertCircle size={24} color={colors.status.warning} />
-          <View style={styles.warningContent}>
-            <Text style={styles.warningTitle}>Important Notice</Text>
-            <Text style={styles.warningText}>
-              Changing your email address here will only update it for this mobile app. Your email address in the member portal and other services will remain unchanged.
-            </Text>
-            <Text style={styles.warningSubtext}>
-              To update your email across all services, please use one of the options below:
-            </Text>
-          </View>
-        </Animated.View>
-
-        <Animated.View style={styles.navigationCard} entering={FadeInUp.delay(275)}>
-          <Text style={styles.navigationTitle}>Update Email Everywhere</Text>
-
-          <View style={styles.navigationButtons}>
-            <AnimatedTouchableOpacity
-              style={styles.navigationButton}
-              onPress={() => setShowUpdateMembership(true)}
-              entering={FadeInUp.delay(300)}
-            >
-              <View style={styles.navigationButtonContent}>
-                <Text style={styles.navigationButtonTitle}>Update Membership</Text>
-                <Text style={styles.navigationButtonSubtitle}>Change email across all services</Text>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <Card padding="lg" style={styles.currentEmailCard}>
+              <View style={styles.iconContainer}>
+                <Mail size={moderateScale(22)} color={colors.primary.main} />
               </View>
-              <View style={styles.navigationChevron}>
-                <AlertCircle size={18} color={colors.primary.main} />
+              <View style={styles.emailContent}>
+                <SmartText variant="body2" style={styles.label}>Current Email</SmartText>
+                <SmartText variant="body1" style={styles.currentEmail}>{userData?.email}</SmartText>
               </View>
-            </AnimatedTouchableOpacity>
-
-            <AnimatedTouchableOpacity
-              style={styles.navigationButton}
-              onPress={() => router.push('/(tabs)/chat')}
-              entering={FadeInUp.delay(325)}
-            >
-              <View style={styles.navigationButtonContent}>
-                <Text style={styles.navigationButtonTitle}>Contact Concierge</Text>
-                <Text style={styles.navigationButtonSubtitle}>Get assistance with email changes</Text>
-              </View>
-              <View style={styles.navigationChevron}>
-                <AlertCircle size={18} color={colors.secondary.main} />
-              </View>
-            </AnimatedTouchableOpacity>
-          </View>
-        </Animated.View>
-
-        {error && (
-          <Animated.View style={styles.errorContainer} entering={FadeInUp}>
-            <AlertCircle size={20} color={colors.status.error} />
-            <Text style={styles.errorText}>{error}</Text>
+            </Card>
           </Animated.View>
-        )}
 
-        {success && (
-          <Animated.View style={styles.successContainer} entering={FadeInUp}>
-            <AlertCircle size={20} color={colors.status.success} />
-            <Text style={styles.successText}>
-              Email address has been successfully updated! You can now sign in with your new email address.
-            </Text>
-          </Animated.View>
-        )}
-
-        {emailSent && !success ? (
-          <Animated.View style={styles.emailSentContainer} entering={FadeInUp.delay(300)}>
-            <Mail size={24} color={colors.primary.main} />
-            <Text style={styles.emailSentTitle}>Check Your Email</Text>
-            <Text style={styles.emailSentText}>
-              We've sent a confirmation email to <Text style={styles.emailHighlight}>{newEmail}</Text>. Please click the link in the email to confirm your new email address.
-            </Text>
-            <Text style={styles.emailSentSubtext}>
-              Don't see the email? Check your spam or junk folder.
-            </Text>
-          </Animated.View>
-        ) : (
-          <Animated.View style={styles.formContainer} entering={FadeInUp.delay(350)}>
-            <Text style={styles.formTitle}>Change App Email Only</Text>
-            <Text style={styles.formSubtitle}>
-              This will only change your email for this mobile app. To update your email everywhere, use the options above.
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>New Email Address</Text>
-              <TextInput
-                style={[styles.input, error ? styles.inputError : null]}
-                value={newEmail}
-                onChangeText={(text) => {
-                  setNewEmail(text);
-                  setError(null);
-                }}
-                placeholder="Enter new email address"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                placeholderTextColor={colors.text.secondary}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Confirm with Password</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    setError(null);
-                  }}
-                  placeholder="Enter your current password"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  placeholderTextColor={colors.text.secondary}
-                />
-                <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
-                  {showPassword ? (
-                    <EyeOff size={20} color={colors.text.secondary} />
-                  ) : (
-                    <Eye size={20} color={colors.text.secondary} />
-                  )}
-                </TouchableOpacity>
+          <Animated.View entering={FadeInUp.delay(250)}>
+            <Card padding="md" variant="outlined" style={styles.warningCard}>
+              <AlertCircle size={moderateScale(22)} color={colors.status.warning} style={{ marginRight: responsiveSize.sm }} />
+              <View style={styles.warningContent}>
+                <SmartText variant="body1" style={styles.warningTitle}>Important Notice</SmartText>
+                <SmartText variant="body2" style={styles.warningText}>
+                  Changing your email address here will only update your app login credentials.
+                </SmartText>
+                <SmartText variant="body2" style={styles.warningSubtext}>
+                  To update your email across all providers and services, use one of the options below:
+                </SmartText>
               </View>
-              <Text style={styles.helperText}>
-                We need your current password to confirm this change
-              </Text>
-            </View>
-
-            <AnimatedTouchableOpacity
-              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
-              onPress={handleEmailChange}
-              disabled={isLoading}
-              entering={FadeInUp.delay(425)}
-            >
-              <Text style={styles.submitButtonText}>
-                {isLoading ? 'Updating App Email...' : 'Update App Email Only'}
-              </Text>
-            </AnimatedTouchableOpacity>
+            </Card>
           </Animated.View>
-        )}
 
-        <Animated.View style={styles.infoCard} entering={FadeInUp.delay(450)}>
-          <AlertCircle size={20} color={colors.status.info} />
-          <Text style={styles.infoText}>
-            After updating your app email, you'll receive a verification email at your new address. This change only affects your mobile app login.
-          </Text>
-        </Animated.View>
+          <Animated.View entering={FadeInUp.delay(275)}>
+            <Card padding="lg" style={styles.navigationCard}>
+              <SmartText variant="h3" style={styles.navigationTitle}>Update Email Everywhere</SmartText>
+
+              <View style={styles.navigationButtons}>
+                <AnimatedTouchableOpacity
+                  style={styles.navigationButton}
+                  onPress={() => setShowUpdateMembership(true)}
+                  entering={FadeInUp.delay(300)}
+                >
+                  <View style={styles.navigationButtonContent}>
+                    <SmartText variant="body1" style={styles.navigationButtonTitle}>Update Membership</SmartText>
+                    <SmartText variant="body2" style={styles.navigationButtonSubtitle}>Change email across all services</SmartText>
+                  </View>
+                  <View style={styles.navigationChevron}>
+                    <AlertCircle size={moderateScale(16)} color={colors.primary.main} />
+                  </View>
+                </AnimatedTouchableOpacity>
+
+                <AnimatedTouchableOpacity
+                  style={styles.navigationButton}
+                  onPress={() => router.push('/(tabs)/chat')}
+                  entering={FadeInUp.delay(325)}
+                >
+                  <View style={styles.navigationButtonContent}>
+                    <SmartText variant="body1" style={styles.navigationButtonTitle}>Contact Concierge</SmartText>
+                    <SmartText variant="body2" style={styles.navigationButtonSubtitle}>Get assistance with email changes</SmartText>
+                  </View>
+                  <View style={styles.navigationChevron}>
+                    <AlertCircle size={moderateScale(16)} color={colors.secondary.main} />
+                  </View>
+                </AnimatedTouchableOpacity>
+              </View>
+            </Card>
+          </Animated.View>
+
+          {error && (
+            <Animated.View entering={FadeInUp}>
+              <Card padding="md" variant="outlined" style={styles.errorContainer}>
+                <AlertCircle size={moderateScale(18)} color={colors.status.error} style={{ marginRight: responsiveSize.xs }} />
+                <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
+              </Card>
+            </Animated.View>
+          )}
+
+          {success ? (
+            <Animated.View entering={FadeInUp}>
+              <Card padding="lg" style={styles.successContainer}>
+                <Mail size={moderateScale(24)} color={colors.status.success} />
+                <SmartText variant="h3" style={styles.successTitle}>Email Updated!</SmartText>
+                <SmartText variant="body1" style={styles.successText}>
+                  Your email address has been successfully updated for app login. You can now sign in with your new email address.
+                </SmartText>
+                <Card padding="md" variant="outlined" style={styles.successInfoCard}>
+                  <AlertCircle size={moderateScale(18)} color={colors.status.info} style={{ marginRight: responsiveSize.xs }} />
+                  <View style={styles.successInfoContent}>
+                    <SmartText variant="body2" style={styles.successInfoText}>
+                      This change only affects your app login. To update your email across all providers and services, please submit an email change request using the options above.
+                    </SmartText>
+                  </View>
+                </Card>
+              </Card>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeInUp.delay(350)}>
+              <Card padding="lg" style={styles.formContainer}>
+                <SmartText variant="h3" style={styles.formTitle}>Change App Login Email</SmartText>
+                <SmartText variant="body1" style={styles.formSubtitle}>
+                  This will instantly update your email for app login only.
+                </SmartText>
+
+                <View style={styles.inputGroup}>
+                  <SmartText variant="body2" style={styles.inputLabel}>New Email Address</SmartText>
+                  <TextInput
+                    style={[styles.input, error ? styles.inputError : null]}
+                    value={newEmail}
+                    onChangeText={(text) => {
+                      setNewEmail(text);
+                      setError(null);
+                    }}
+                    placeholder="Enter new email address"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    placeholderTextColor={colors.text.secondary}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <SmartText variant="body2" style={styles.inputLabel}>Confirm with Password</SmartText>
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.passwordInput}
+                      value={password}
+                      onChangeText={(text) => {
+                        setPassword(text);
+                        setError(null);
+                      }}
+                      placeholder="Enter your current password"
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      placeholderTextColor={colors.text.secondary}
+                    />
+                    <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
+                      {showPassword ? (
+                        <EyeOff size={moderateScale(18)} color={colors.text.secondary} />
+                      ) : (
+                        <Eye size={moderateScale(18)} color={colors.text.secondary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  <SmartText variant="caption" style={styles.helperText}>
+                    We need your current password to confirm this change
+                  </SmartText>
+                </View>
+
+                <AnimatedTouchableOpacity
+                  style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+                  onPress={handleEmailChange}
+                  disabled={isLoading}
+                  entering={FadeInUp.delay(425)}
+                >
+                  <SmartText variant="body1" style={styles.submitButtonText}>
+                    {isLoading ? 'Updating Email...' : 'Update Email Now'}
+                  </SmartText>
+                </AnimatedTouchableOpacity>
+              </Card>
+            </Animated.View>
+          )}
+
+          <Animated.View entering={FadeInUp.delay(450)}>
+            <Card padding="md" variant="outlined" style={styles.infoCard}>
+              <AlertCircle size={moderateScale(18)} color={colors.status.info} style={{ marginRight: responsiveSize.xs }} />
+              <SmartText variant="body2" style={styles.infoText}>
+                This will update your login credentials for this app only. No email confirmation required.
+              </SmartText>
+            </Card>
+          </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // ... keep existing styles unchanged (same as you provided) ...
   container: {
     flex: 1,
     backgroundColor: colors.background.paper,
   },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.md,
+    ...platformStyles.shadowSm,
   },
   title: {
-    ...typography.h2,
     fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   headerContent: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   headerTitle: {
-    ...typography.h3,
+    fontWeight: '600',
     color: colors.text.primary,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
   },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   currentEmailCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    ...shadows.md,
+    gap: responsiveSize.sm,
+    marginBottom: responsiveSize.lg,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
+    width: moderateScale(44),
+    height: moderateScale(44),
     borderRadius: borderRadius.full,
     backgroundColor: rgbaFromHex(colors.primary.main, 0.15),
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.sm,
+    flexShrink: 0,
+  },
+  emailContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
   },
   label: {
-    ...typography.body2,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
   },
   currentEmail: {
-    ...typography.body1,
     fontWeight: '600',
     color: colors.text.primary,
   },
+
   errorContainer: {
     backgroundColor: rgbaFromHex(colors.status.error, 0.1),
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
+    borderColor: rgbaFromHex(colors.status.error, 0.3),
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.sm,
+    marginBottom: responsiveSize.lg,
   },
   errorText: {
     flex: 1,
-    ...typography.body2,
     color: colors.status.error,
-    lineHeight: 20,
   },
+
+  successContainer: {
+    backgroundColor: rgbaFromHex(colors.status.success, 0.1),
+    alignItems: 'center',
+    marginBottom: responsiveSize.lg,
+    gap: responsiveSize.sm,
+  },
+  successTitle: {
+    color: colors.status.success,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  successText: {
+    color: colors.status.success,
+    textAlign: 'center',
+  },
+  successInfoCard: {
+    backgroundColor: rgbaFromHex(colors.status.info, 0.08),
+    borderColor: rgbaFromHex(colors.status.info, 0.2),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: responsiveSize.md,
+  },
+  successInfoContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  successInfoText: {
+    color: colors.status.info,
+  },
+
   formContainer: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-    ...shadows.md,
+    marginBottom: responsiveSize.lg,
+    gap: responsiveSize.md,
   },
   formTitle: {
-    ...typography.h3,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   formSubtitle: {
-    ...typography.body1,
     color: colors.text.secondary,
-    marginBottom: spacing.xl,
-    lineHeight: 24,
   },
+
   inputGroup: {
-    marginBottom: spacing.lg,
+    gap: responsiveSize.xs,
   },
   inputLabel: {
-    ...typography.body2,
     fontWeight: '500',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   input: {
     backgroundColor: colors.background.paper,
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    ...typography.body1,
+    borderRadius: borderRadius.md,
+    padding: responsiveSize.sm,
+    fontSize: moderateScale(15),
     color: colors.text.primary,
+    minHeight: MIN_TOUCH_TARGET,
   },
   inputError: {
     borderColor: colors.status.error,
@@ -426,181 +455,114 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.paper,
     borderWidth: 1,
     borderColor: colors.gray[200],
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.md,
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: MIN_TOUCH_TARGET,
   },
   passwordInput: {
     flex: 1,
-    padding: spacing.md,
-    ...typography.body1,
+    padding: responsiveSize.sm,
+    fontSize: moderateScale(15),
     color: colors.text.primary,
   },
   eyeButton: {
-    padding: spacing.md,
+    padding: responsiveSize.sm,
   },
   helperText: {
-    ...typography.caption,
     color: colors.text.secondary,
-    marginTop: spacing.xs,
   },
+
   submitButton: {
     backgroundColor: colors.primary.main,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    padding: responsiveSize.sm,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
-    ...shadows.md,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadow,
   },
   submitButtonDisabled: {
     opacity: 0.7,
   },
   submitButtonText: {
     color: colors.background.default,
-    ...typography.body1,
     fontWeight: '600',
   },
+
   infoCard: {
     backgroundColor: rgbaFromHex(colors.status.info, 0.08),
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderColor: rgbaFromHex(colors.status.info, 0.2),
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.sm,
   },
   infoText: {
     flex: 1,
-    ...typography.body2,
     color: colors.status.info,
-    lineHeight: 20,
   },
-  successContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${colors.status.success}10`,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.xl,
-  },
-  successText: {
-    color: colors.status.success,
-    marginLeft: spacing.sm,
-    flex: 1,
-    ...typography.body2,
-  },
-  emailSentContainer: {
-    backgroundColor: `${colors.primary.main}08`,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  emailSentTitle: {
-    ...typography.h3,
-    color: colors.primary.main,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  emailSentText: {
-    ...typography.body1,
-    color: colors.primary.main,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: spacing.sm,
-  },
-  emailHighlight: {
-    fontWeight: '600',
-  },
-  emailSentSubtext: {
-    ...typography.body2,
-    color: colors.primary.main,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
+
   warningCard: {
     backgroundColor: rgbaFromHex(colors.status.warning, 0.08),
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
+    borderColor: rgbaFromHex(colors.status.warning, 0.2),
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
+    marginBottom: responsiveSize.lg,
   },
   warningContent: {
     flex: 1,
     minWidth: 0,
+    gap: responsiveSize.xs,
   },
   warningTitle: {
-    ...typography.h4,
     fontWeight: '600',
     color: colors.status.warning,
-    marginBottom: spacing.xs,
-    flexWrap: 'wrap',
   },
   warningText: {
-    ...typography.body2,
     color: colors.status.warning,
-    lineHeight: 20,
-    marginBottom: spacing.sm,
-    flexWrap: 'wrap',
   },
   warningSubtext: {
-    ...typography.body2,
     color: colors.status.warning,
-    lineHeight: 20,
     fontWeight: '500',
-    flexWrap: 'wrap',
   },
+
   navigationCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-    ...shadows.md,
+    marginBottom: responsiveSize.lg,
+    gap: responsiveSize.md,
   },
   navigationTitle: {
-    ...typography.h3,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.lg,
     textAlign: 'center',
-    flexWrap: 'wrap',
   },
   navigationButtons: {
-    gap: spacing.md,
+    gap: responsiveSize.sm,
   },
   navigationButton: {
     backgroundColor: colors.background.paper,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 70,
-    ...shadows.sm,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
   navigationButtonContent: {
     flex: 1,
     minWidth: 0,
-    marginRight: spacing.sm,
+    marginRight: responsiveSize.xs,
+    gap: responsiveSize.xs / 4,
   },
   navigationButtonTitle: {
-    ...typography.h4,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs / 2,
-    flexWrap: 'wrap',
   },
   navigationButtonSubtitle: {
-    ...typography.body2,
     color: colors.text.secondary,
-    flexWrap: 'wrap',
-    lineHeight: 18,
   },
   navigationChevron: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: borderRadius.md,
     backgroundColor: rgbaFromHex(colors.primary.main, 0.1),
     justifyContent: 'center',
     alignItems: 'center',

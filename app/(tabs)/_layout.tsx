@@ -9,7 +9,8 @@ import { Platform, View, Pressable, StyleSheet } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/hooks/useAuth';
-import { colors, spacing } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -17,7 +18,7 @@ const AnimatedView = Animated.createAnimatedComponent(View);
 export default function TabLayout() {
   const { session, loading } = useAuth();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = Platform.OS === 'ios' ? 60 + insets.bottom : 60;
+  const tabBarHeight = moderateScale(60) + (Platform.OS === 'ios' ? insets.bottom : Math.max(insets.bottom, responsiveSize.sm));
 
   if (loading) return null;
   if (!session) return <Redirect href="/auth/sign-in" />;
@@ -32,15 +33,15 @@ export default function TabLayout() {
           styles.tabBarBase,
           {
             height: tabBarHeight,
-            paddingBottom: Platform.OS === 'ios' ? insets.bottom : spacing.sm,
-            paddingTop: spacing.sm,
+            paddingBottom: Platform.OS === 'ios' ? insets.bottom : Math.max(insets.bottom, responsiveSize.sm),
+            paddingTop: responsiveSize.sm,
           },
           Platform.select({ ios: styles.tabBarIOS, android: styles.tabBarAndroid }),
         ],
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: moderateScale(11),
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: responsiveSize.xs / 4,
           letterSpacing: 0.2,
         },
         tabBarItemStyle: {
@@ -49,7 +50,7 @@ export default function TabLayout() {
           justifyContent: 'center',
         },
         tabBarIconStyle: {
-          marginTop: 2,
+          marginTop: responsiveSize.xs / 4,
         },
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (
@@ -92,21 +93,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <HomeIcon size={24} color={color} />,
+          tabBarIcon: ({ color }) => <HomeIcon size={moderateScale(24)} color={color} />,
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
           title: 'Concierge',
-          tabBarIcon: ({ color }) => <MessageCircle size={24} color={color} />,
+          tabBarIcon: ({ color }) => <MessageCircle size={moderateScale(24)} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <UserIcon size={24} color={color} />,
+          tabBarIcon: ({ color }) => <UserIcon size={moderateScale(24)} color={color} />,
         }}
       />
     </Tabs>
@@ -117,30 +118,27 @@ const styles = StyleSheet.create({
   tabBarBase: {
     borderTopWidth: 0.5,
     borderTopColor: colors.gray[200],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    ...platformStyles.shadowSm,
   },
   tabBarIOS: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
   tabBarAndroid: {
     backgroundColor: colors.background.default,
-    elevation: 8,
+    elevation: moderateScale(8),
   },
   tabPressable: {
     flex: 1,
-    borderRadius: 12,
-    marginHorizontal: 4,
+    borderRadius: borderRadius.md,
+    marginHorizontal: responsiveSize.xs / 2,
     overflow: 'hidden',
   },
   tabAnimated: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    borderRadius: borderRadius.md,
+    paddingVertical: responsiveSize.xs,
+    paddingHorizontal: responsiveSize.sm,
   },
 });

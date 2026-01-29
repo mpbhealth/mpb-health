@@ -75,6 +75,11 @@ export default function CreateAccountScreen() {
     isPrimary,
     relationship,
     primaryId,
+    activeDate,
+    inactiveDate,
+    inactiveReason,
+    isActive,
+    createdDate,
   } = useLocalSearchParams();
 
   const [password, setPassword] = useState('');
@@ -166,6 +171,25 @@ export default function CreateAccountScreen() {
 
       setIsLoading(true);
 
+      // ----- Final safety check: verify email is not already registered in auth -----
+      const checkAuthUrl = `${supabase.supabaseUrl}/functions/v1/check-email-exists`;
+      const authCheckRes = await fetch(checkAuthUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({ email: emailVal }),
+      });
+
+      if (authCheckRes.ok) {
+        const { exists: authExists } = await authCheckRes.json();
+        if (authExists) {
+          setError('An account already exists for this email. Please sign in instead.');
+          return;
+        }
+      }
+
       // ----- Create auth account (Auth always stores lowercase; we send lowercase) -----
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: emailVal,
@@ -193,6 +217,11 @@ export default function CreateAccountScreen() {
         is_primary: normalizedIsPrimary,
         relationship: relationshipVal,
         primary_id: normalizedIsPrimary ? null : (toNullableNumber(primaryIdVal) ?? primaryIdVal),
+        active_date: activeDate ? formatDateForStorage(String(activeDate)) : null,
+        inactive_date: inactiveDate ? formatDateForStorage(String(inactiveDate)) : null,
+        inactive_reason: inactiveReason ? String(inactiveReason) : null,
+        is_active: isActive !== undefined && isActive !== null ? parseBool(isActive) : null,
+        created_date: createdDate ? String(createdDate) : null,
       };
 
       // If your users.id is the PK = auth user id, insert is fine.

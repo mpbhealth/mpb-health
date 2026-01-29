@@ -44,14 +44,8 @@ export default function NotificationDetailScreen() {
       description: 'Manage your healthcare with comprehensive service options:',
       features: [
         {
-          title: 'Health Wallet',
-          description: 'Available for Premium HSA, Secure HSA, MEC Plus Essentials, Premium Care, and Care Plus members - Access your digital health wallet and benefits.',
-          icon: Shield,
-          color: colors.primary.main,
-        },
-        {
           title: 'Telehealth',
-          description: 'Available for all other members - Connect to 24/7 telehealth services with board-certified physicians.',
+          description: 'Available for all members - Connect to 24/7 telehealth services with board-certified physicians.',
           icon: Shield,
           color: colors.primary.light,
         },
@@ -69,7 +63,7 @@ export default function NotificationDetailScreen() {
         },
         {
           title: 'Sharing Programs',
-          description: 'Available for all other members - Submit medical needs through Zion Health or Sedera Health sharing programs.',
+          description: 'Available for all members - Submit medical needs through Zion Health or Sedera Health sharing programs.',
           icon: Shield,
           color: colors.primary.main,
         },
@@ -113,14 +107,14 @@ export default function NotificationDetailScreen() {
     'Access Security Settings to change your email or password',
     'Review your Plan Details',
     'Contact your Dedicated Health Advisor directly',
-    'Activate accounts for eligible dependents',
+    'Create app login for eligible dependents',
   ];
 
   return (
     <View style={styles.container}>
       <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Welcome Guide</Text>
+        <Text style={styles.title} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Welcome Guide</Text>
       </Animated.View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -128,8 +122,8 @@ export default function NotificationDetailScreen() {
           <View style={styles.logoContainer}>
             <Image source={logoImg} style={styles.logo} resizeMode="contain" />
           </View>
-          <Text style={styles.welcomeTitle}>Welcome to MPB Health!</Text>
-          <Text style={styles.welcomeText}>
+          <Text style={styles.welcomeTitle} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Welcome to MPB Health!</Text>
+          <Text style={styles.welcomeText} allowFontScaling={false}>
             We're excited to support you on your healthcare journey. This guide will walk you through the key features of the MPB Health mobile app, designed to help you manage your health and wellness effectively.
           </Text>
         </Animated.View>
@@ -140,8 +134,8 @@ export default function NotificationDetailScreen() {
             style={[styles.section, styles.sectionCard]}
             entering={FadeInUp.delay(300 + sectionIndex * 100)}
           >
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <Text style={styles.sectionDescription}>{section.description}</Text>
+            <Text style={styles.sectionTitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">{section.title}</Text>
+            <Text style={styles.sectionDescription} allowFontScaling={false}>{section.description}</Text>
 
             <View style={styles.featuresContainer}>
               {section.features.map((feature, featureIndex) => (
@@ -154,8 +148,8 @@ export default function NotificationDetailScreen() {
                     <feature.icon size={24} color={feature.color} />
                   </View>
                   <View style={styles.featureContent}>
-                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                    <Text style={styles.featureDescription}>{feature.description}</Text>
+                    <Text style={styles.featureTitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">{feature.title}</Text>
+                    <Text style={styles.featureDescription} allowFontScaling={false}>{feature.description}</Text>
                   </View>
                 </Animated.View>
               ))}
@@ -164,8 +158,8 @@ export default function NotificationDetailScreen() {
         ))}
 
         <Animated.View style={[styles.section, styles.sectionCard]} entering={FadeInUp.delay(500)}>
-          <Text style={styles.sectionTitle}>Concierge</Text>
-          <Text style={styles.sectionDescription}>
+          <Text style={styles.sectionTitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">Concierge</Text>
+          <Text style={styles.sectionDescription} allowFontScaling={false}>
             Tap the Concierge tab to connect with our dedicated support team.
             We're here to assist with:
           </Text>
@@ -173,21 +167,21 @@ export default function NotificationDetailScreen() {
             {conciergeServices.map((service, index) => (
               <Animated.View key={index} style={styles.listItem} entering={FadeInUp.delay(600 + index * 50)}>
                 <View style={[styles.bulletPoint, { backgroundColor: colors.primary.main }]} />
-                <Text style={styles.listText}>{service}</Text>
+                <Text style={styles.listText} allowFontScaling={false}>{service}</Text>
               </Animated.View>
             ))}
           </View>
-          <Text style={styles.additionalText}>Reach us via call or secure messaging.</Text>
+          <Text style={styles.additionalText} allowFontScaling={false}>Reach us via call or secure messaging.</Text>
         </Animated.View>
 
         <Animated.View style={[styles.section, styles.sectionCard, styles.lastSection]} entering={FadeInUp.delay(600)}>
-          <Text style={styles.sectionTitle}>Profile</Text>
-          <Text style={styles.sectionDescription}>In the Profile tab, you can:</Text>
+          <Text style={styles.sectionTitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">Profile</Text>
+          <Text style={styles.sectionDescription} allowFontScaling={false}>In the Profile tab, you can:</Text>
           <View style={styles.listContainer}>
             {profileFeatures.map((feature, index) => (
               <Animated.View key={index} style={styles.listItem} entering={FadeInUp.delay(700 + index * 50)}>
                 <View style={[styles.bulletPoint, { backgroundColor: colors.secondary.main }]} />
-                <Text style={styles.listText}>{feature}</Text>
+                <Text style={styles.listText} allowFontScaling={false}>{feature}</Text>
               </Animated.View>
             ))}
           </View>
@@ -214,6 +208,7 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.text.primary,
     marginLeft: spacing.sm,
+    flexShrink: 1,
   },
   content: {
     flex: 1,
@@ -225,6 +220,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     marginBottom: spacing.xl,
     ...shadows.md,
+    overflow: 'hidden',
   },
   logoContainer: {
     width: '100%',
@@ -241,12 +237,14 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: spacing.md,
     textAlign: 'center',
+    flexShrink: 1,
   },
   welcomeText: {
     ...typography.body1,
     color: colors.text.secondary,
     lineHeight: 24,
     textAlign: 'center',
+    flexShrink: 1,
   },
   section: {
     marginBottom: spacing.xl,
@@ -264,12 +262,14 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.text.primary,
     marginBottom: spacing.sm,
+    flexShrink: 1,
   },
   sectionDescription: {
     ...typography.body1,
     color: colors.text.secondary,
     marginBottom: spacing.lg,
     lineHeight: 24,
+    flexShrink: 1,
   },
   featuresContainer: {
     gap: spacing.md,
@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   iconContainer: {
     width: 48,
@@ -291,16 +292,19 @@ const styles = StyleSheet.create({
   },
   featureContent: {
     flex: 1,
+    overflow: 'hidden',
   },
   featureTitle: {
     ...typography.h4,
     color: colors.text.primary,
     marginBottom: spacing.xs,
+    flexShrink: 1,
   },
   featureDescription: {
     ...typography.body2,
     color: colors.text.secondary,
     lineHeight: 20,
+    flexShrink: 1,
   },
   listContainer: {
     gap: spacing.md,
@@ -321,10 +325,12 @@ const styles = StyleSheet.create({
     ...typography.body1,
     color: colors.text.secondary,
     lineHeight: 24,
+    flexShrink: 1,
   },
   additionalText: {
     ...typography.body1,
     color: colors.text.secondary,
     marginTop: spacing.sm,
+    flexShrink: 1,
   },
 });

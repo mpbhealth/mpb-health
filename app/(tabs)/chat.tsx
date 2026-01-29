@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
   Image,
   ScrollView,
   Linking,
-  useWindowDimensions,
   Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -23,26 +21,26 @@ import {
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-// static local logo (adjust relative path if this file moves)
 const logoImg = require('../../assets/images/logo.png');
 
 export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 640;
+  const { isTablet } = useResponsive();
 
-  // ✅ Updated business hours for Concierge
   const conciergeHours = [
     { day: 'Mon – Fri', hours: '9:00 AM – 5:00 PM EST' },
     { day: 'Sat – Sun', hours: 'Closed' },
   ];
 
-  // ☎️ Telehealth uses this number 24/7 (Option 2)
   const phoneNumber = '+1 800 519 2969';
   const telprompt = `telprompt:${phoneNumber}`;
   const tel = `tel:${phoneNumber}`;
@@ -96,7 +94,6 @@ export default function ChatScreen() {
     }
   };
 
-  // 🔓 Chat is always available in the app (we just display concierge hours separately)
   const goChat = () => {
     router.push('/chatWithConcierge' as never);
   };
@@ -108,244 +105,277 @@ export default function ChatScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Platform.OS === 'ios' ? insets.top + spacing.lg : spacing.xl,
-            paddingBottom: insets.bottom + spacing.xl,
+            paddingTop: Platform.OS === 'ios' ? insets.top + responsiveSize.lg : responsiveSize.xl,
+            paddingBottom: insets.bottom + responsiveSize.xl,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* — Welcome */}
-        <Animated.View entering={FadeInDown.delay(100)} style={styles.welcome}>
-          <Image source={logoImg} style={styles.logo} />
-          <Text style={styles.title}>Health Concierge</Text>
-          <Text style={styles.subtitle}>
-            Get personalized support for all your healthcare questions and needs.
-          </Text>
-        </Animated.View>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInDown.delay(100)}>
+            <Card padding="lg" variant="elevated" style={styles.welcomeCard}>
+              <Image source={logoImg} style={styles.logo} resizeMode="contain" />
+              <SmartText variant="h2" style={styles.title}>
+                Health Concierge
+              </SmartText>
+              <SmartText variant="body1" style={styles.subtitle}>
+                Get personalized support for all your healthcare questions and needs.
+              </SmartText>
+            </Card>
+          </Animated.View>
 
-        {/* — Divider */}
-        <View style={styles.divider} />
+          <View style={styles.divider} />
 
-        {/* — Support Hours (concierge + telehealth note) */}
-        <Animated.View entering={FadeInUp.delay(200)} style={styles.hoursCard}>
-          <View style={styles.hoursHeader}>
-            <Clock size={20} color={colors.primary.main} />
-            <Text style={styles.hoursTitle}>Support Hours</Text>
-          </View>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <Card padding="lg" variant="elevated" style={styles.hoursCard}>
+              <View style={styles.hoursHeader}>
+                <Clock size={moderateScale(20)} color={colors.primary.main} />
+                <SmartText variant="h4" style={styles.hoursTitle}>
+                  Support Hours
+                </SmartText>
+              </View>
 
-          {/* Concierge hours */}
-          <Text style={styles.sectionLabel}>Concierge</Text>
-          {conciergeHours.map((s, i) => (
-            <Animated.View
-              key={i}
-              entering={FadeInUp.delay(300 + 100 * i)}
+              <SmartText variant="caption" style={styles.sectionLabel}>
+                Concierge
+              </SmartText>
+              {conciergeHours.map((s, i) => (
+                <Animated.View
+                  key={i}
+                  entering={FadeInUp.delay(300 + 100 * i)}
+                  layout={Layout.springify()}
+                  style={[styles.hourRow, i === conciergeHours.length - 1 && styles.lastHourRow]}
+                >
+                  <SmartText variant="body1" style={styles.hourDay}>
+                    {s.day}
+                  </SmartText>
+                  <SmartText
+                    variant="body1"
+                    style={[styles.hourTime, s.hours === 'Closed' && styles.hourClosed]}
+                  >
+                    {s.hours}
+                  </SmartText>
+                </Animated.View>
+              ))}
+
+              <View style={[styles.telehealthNote, styles.hourRow]}>
+                <SmartText variant="body1" style={styles.hourDay}>
+                  Telehealth Support
+                </SmartText>
+                <View style={styles.badge}>
+                  <SmartText variant="caption" style={styles.badgeText}>
+                    24/7
+                  </SmartText>
+                </View>
+              </View>
+              <SmartText variant="caption" style={styles.noteText}>
+                For Telehealth Support, Select <SmartText variant="caption" style={styles.noteStrong}>Option 2</SmartText> When calling <SmartText variant="caption" style={styles.noteStrong}>Concierge number</SmartText>.
+              </SmartText>
+            </Card>
+          </Animated.View>
+
+          <View style={styles.divider} />
+
+          <Animated.View entering={FadeInUp.delay(400)} style={[styles.actions, isTablet && styles.actionsWide]}>
+            <AnimatedTouchable
+              entering={FadeInUp.delay(500)}
               layout={Layout.springify()}
-              style={[styles.hourRow, i === conciergeHours.length - 1 && styles.lastHourRow]}
+              style={[styles.actionButton, styles.chatBtn, isTablet && styles.flexOne]}
+              onPress={goChat}
+              activeOpacity={0.85}
             >
-              <Text style={styles.hourDay}>{s.day}</Text>
-              <Text style={[styles.hourTime, s.hours === 'Closed' && styles.hourClosed]}>
-                {s.hours}
-              </Text>
-            </Animated.View>
-          ))}
-
-          {/* Telehealth 24/7 note explicitly pointing to Option 2 */}
-          <View style={[styles.telehealthNote, styles.hourRow]}>
-            <Text style={styles.hourDay}>Telehealth Support</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>24/7</Text>
-            </View>
-          </View>
-          <Text style={styles.noteText}>
-            For Telehealth Support, Select <Text style={styles.noteStrong}>Option 2</Text> When calling <Text style={styles.noteStrong}>Concierge number</Text>.
-          </Text>
-        </Animated.View>
-
-        <View style={styles.divider} />
-
-        {/* — Actions */}
-        <Animated.View entering={FadeInUp.delay(400)} style={[styles.actions, isWide && styles.actionsWide]}>
-          {/* Chat */}
-          <AnimatedTouchable
-            entering={FadeInUp.delay(500)}
-            layout={Layout.springify()}
-            style={[styles.actionButton, styles.chatBtn, isWide && styles.flexOne]}
-            onPress={goChat}
-            activeOpacity={0.85}
-          >
-            <View style={styles.actionInner}>
-              <MessageSquare size={24} color="#fff" />
-              <Text style={styles.chatText}>Start Chat</Text>
-              <ArrowRight size={20} color="#fff" />
-            </View>
-          </AnimatedTouchable>
-
-          {/* Call Concierge */}
-          <AnimatedTouchable
-            entering={FadeInUp.delay(600)}
-            layout={Layout.springify()}
-            style={[styles.actionButton, isWide && styles.flexOne]}
-            onPress={handleCall}
-          >
-            <View style={styles.iconBox}>
-              <Phone size={20} color={colors.primary.main} />
-            </View>
-            <View style={styles.textBox}>
-              <Text style={styles.contactLabel}>Call Concierge</Text>
-              <View style={styles.contactRow}>
-                <Text style={styles.contactValue}>{phoneNumber}</Text>
-                {!canCall && (
-                  <TouchableOpacity onPress={() => copy(phoneNumber)} style={styles.copyBtn}>
-                    <Copy size={14} color={colors.text.secondary} />
-                  </TouchableOpacity>
-                )}
+              <View style={styles.actionInner}>
+                <MessageSquare size={moderateScale(24)} color="#fff" />
+                <SmartText variant="h4" style={styles.chatText}>
+                  Start Chat
+                </SmartText>
+                <ArrowRight size={moderateScale(20)} color="#fff" />
               </View>
-            </View>
-          </AnimatedTouchable>
+            </AnimatedTouchable>
 
-          {/* Email (Concierge) */}
-          <AnimatedTouchable
-            entering={FadeInUp.delay(700)}
-            layout={Layout.springify()}
-            style={[styles.actionButton, isWide && styles.flexOne]}
-            onPress={handleEmail}
-          >
-            <View style={styles.iconBox}>
-              <Mail size={20} color={colors.primary.main} />
-            </View>
-            <View style={styles.textBox}>
-              <Text style={styles.contactLabel}>Email Concierge</Text>
-              <View style={styles.contactRow}>
-                <Text style={styles.contactValue}>concierge@mympb.com</Text>
-                {!canEmail && (
-                  <TouchableOpacity onPress={() => copy('concierge@mympb.com')} style={styles.copyBtn}>
-                    <Copy size={14} color={colors.text.secondary} />
-                  </TouchableOpacity>
-                )}
+            <AnimatedTouchable
+              entering={FadeInUp.delay(600)}
+              layout={Layout.springify()}
+              style={[styles.actionButton, isTablet && styles.flexOne]}
+              onPress={handleCall}
+            >
+              <View style={styles.iconBox}>
+                <Phone size={moderateScale(20)} color={colors.primary.main} />
               </View>
-            </View>
-          </AnimatedTouchable>
-        </Animated.View>
+              <View style={styles.textBox}>
+                <SmartText variant="caption" style={styles.contactLabel}>
+                  Call Concierge
+                </SmartText>
+                <View style={styles.contactRow}>
+                  <SmartText variant="body1" style={styles.contactValue} maxLines={1}>
+                    {phoneNumber}
+                  </SmartText>
+                  {!canCall && (
+                    <TouchableOpacity onPress={() => copy(phoneNumber)} style={styles.copyBtn}>
+                      <Copy size={moderateScale(14)} color={colors.text.secondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </AnimatedTouchable>
+
+            <AnimatedTouchable
+              entering={FadeInUp.delay(700)}
+              layout={Layout.springify()}
+              style={[styles.actionButton, isTablet && styles.flexOne]}
+              onPress={handleEmail}
+            >
+              <View style={styles.iconBox}>
+                <Mail size={moderateScale(20)} color={colors.primary.main} />
+              </View>
+              <View style={styles.textBox}>
+                <SmartText variant="caption" style={styles.contactLabel}>
+                  Email Concierge
+                </SmartText>
+                <View style={styles.contactRow}>
+                  <SmartText variant="body1" style={styles.contactValue} maxLines={1}>
+                    concierge@mympb.com
+                  </SmartText>
+                  {!canEmail && (
+                    <TouchableOpacity onPress={() => copy('concierge@mympb.com')} style={styles.copyBtn}>
+                      <Copy size={moderateScale(14)} color={colors.text.secondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </AnimatedTouchable>
+          </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // container + scroll
-  container: { flex: 1, backgroundColor: colors.background.paper },
-  scroll: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.paper
+  },
+  scroll: {
+    flex: 1
+  },
   content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingHorizontal: responsiveSize.lg,
   },
 
-  // welcome card
-  welcome: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    ...shadows.md,
-    marginBottom: spacing.md,
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
   },
-  logo: { width: 200, height: 50, marginBottom: spacing.xl, resizeMode: 'contain' as const },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
+  welcomeCard: {
+    alignItems: 'center',
+    marginBottom: responsiveSize.md,
+  },
+  logo: {
+    width: moderateScale(200),
+    height: moderateScale(50),
+    marginBottom: responsiveSize.xl,
+  },
   title: {
-    ...typography.h2,
     textAlign: 'center',
-    marginBottom: spacing.sm,
-    fontWeight: '700' as const,
+    marginBottom: responsiveSize.sm,
     color: colors.text.primary,
   },
   subtitle: {
-    ...typography.body1,
     textAlign: 'center',
     color: colors.text.secondary,
-    maxWidth: 400,
-    lineHeight: 24,
+    maxWidth: moderateScale(400),
   },
 
-  // section divider
   divider: {
     height: 1,
     backgroundColor: colors.gray[200],
-    marginVertical: spacing.lg,
+    marginVertical: responsiveSize.lg,
   },
 
-  // support hours
   hoursCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    ...shadows.sm,
-    marginBottom: spacing.md,
+    marginBottom: responsiveSize.md,
   },
-  hoursHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  hoursHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: responsiveSize.md,
+    gap: responsiveSize.sm,
+  },
   hoursTitle: {
-    ...typography.h4,
-    marginLeft: spacing.sm,
     color: colors.text.primary,
+    flex: 1,
   },
   sectionLabel: {
-    ...typography.caption,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
-    marginTop: spacing.xs,
+    marginBottom: responsiveSize.xs,
+    marginTop: responsiveSize.xs,
+    textTransform: 'uppercase',
   },
   hourRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    paddingVertical: responsiveSize.sm,
     borderTopWidth: 1,
     borderTopColor: colors.gray[100],
+    gap: responsiveSize.sm,
   },
-  lastHourRow: { borderBottomWidth: 0 },
+  lastHourRow: {
+    borderBottomWidth: 0
+  },
   hourDay: {
-    ...typography.body1,
     fontWeight: '600',
     color: colors.text.primary,
+    flex: 1,
   },
   hourTime: {
-    ...typography.body1,
     color: colors.primary.main,
+    textAlign: 'right',
   },
-  hourClosed: { color: colors.status.error },
+  hourClosed: {
+    color: colors.status.error
+  },
 
   telehealthNote: {
     alignItems: 'center',
   },
   noteText: {
-    ...typography.caption,
     color: colors.text.secondary,
-    marginTop: spacing.xs,
+    marginTop: responsiveSize.xs,
   },
-  noteStrong: { fontWeight: '700', color: colors.text.primary },
+  noteStrong: {
+    fontWeight: '700',
+    color: colors.text.primary
+  },
 
-  // actions container
   actions: {
     flexDirection: 'column',
-    gap: spacing.md,
+    gap: responsiveSize.md,
   },
   actionsWide: {
     flexDirection: 'row',
-    gap: spacing.md,
   },
-  flexOne: { flex: 1 },
+  flexOne: {
+    flex: 1
+  },
 
-  // shared button styles
   actionButton: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: responsiveSize.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
 
-  // chat button
   chatBtn: {
     backgroundColor: colors.primary.main,
-    ...shadows.lg,
+    ...platformStyles.shadow,
   },
   actionInner: {
     flexDirection: 'row',
@@ -354,64 +384,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatText: {
-    ...typography.h4,
     color: '#fff',
     fontWeight: '600',
-    marginHorizontal: spacing.sm,
+    marginHorizontal: responsiveSize.sm,
+    flex: 1,
   },
 
-  // phone/email icons & text
   iconBox: {
-    width: 44,
-    height: 44,
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
     borderRadius: borderRadius.md,
     backgroundColor: `${colors.primary.main}10`,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.md,
+    flexShrink: 0,
   },
-  textBox: { flex: 1 },
+  textBox: {
+    flex: 1,
+    minWidth: 0,
+  },
 
-  contactLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs / 2,
-  },
   contactLabel: {
-    ...typography.caption,
     color: colors.text.secondary,
-    marginRight: spacing.sm,
+    marginBottom: responsiveSize.xs / 2,
+    textTransform: 'uppercase',
   },
 
   badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
+    paddingHorizontal: responsiveSize.sm,
+    paddingVertical: responsiveSize.xs / 2,
     borderRadius: 999,
     backgroundColor: `${colors.primary.main}12`,
   },
   badgeText: {
-    ...typography.caption,
     color: colors.primary.main,
     fontWeight: '700',
   },
 
-  badgeSmall: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: 999,
-    backgroundColor: `${colors.primary.main}12`,
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: responsiveSize.xs,
   },
-  badgeTextSmall: {
-    ...typography.caption,
-    color: colors.primary.main,
-    fontWeight: '700',
-  },
-
-  contactRow: { flexDirection: 'row', alignItems: 'center' },
   contactValue: {
-    ...typography.body1,
     color: colors.primary.main,
     fontWeight: '500',
+    flex: 1,
   },
-  copyBtn: { marginLeft: spacing.sm, padding: spacing.xs },
+  copyBtn: {
+    padding: responsiveSize.xs,
+    flexShrink: 0,
+    minWidth: MIN_TOUCH_TARGET / 2,
+    minHeight: MIN_TOUCH_TARGET / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

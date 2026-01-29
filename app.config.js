@@ -11,7 +11,7 @@ export default ({ config }) => ({
     ...config.expo,
     name: 'MPB Health',
     slug: 'mpb-health',
-    version: '1.2.1',                 // ⬅️ bumped
+    version: '1.2.9',
     orientation: 'portrait',
     scheme: 'mpbhealth',
     userInterfaceStyle: 'automatic',
@@ -25,7 +25,7 @@ export default ({ config }) => ({
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.mpb.health',
-      buildNumber: '127',             // ⬅️ bumped (must strictly increase)
+      buildNumber: '130',
       associatedDomains: [
         'applinks:mpb.health',
         'applinks:*.supabase.co',
@@ -40,6 +40,35 @@ export default ({ config }) => ({
         UIViewControllerBasedStatusBarAppearance: false,
         UIStatusBarStyle: 'default',
         LSApplicationQueriesSchemes: ['tel', 'telprompt', 'mailto'],
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: false,
+          NSExceptionDomains: {
+            'supabase.co': {
+              NSIncludesSubdomains: true,
+              NSTemporaryExceptionAllowsInsecureHTTPLoads: false,
+              NSTemporaryExceptionRequiresForwardSecrecy: true,
+              NSTemporaryExceptionMinimumTLSVersion: 'TLSv1.2',
+            },
+            'qfigouszitcddkhssqxr.supabase.co': {
+              NSIncludesSubdomains: true,
+              NSTemporaryExceptionAllowsInsecureHTTPLoads: false,
+              NSTemporaryExceptionRequiresForwardSecrecy: true,
+              NSTemporaryExceptionMinimumTLSVersion: 'TLSv1.2',
+            },
+            'mytelemedicine.com': {
+              NSIncludesSubdomains: true,
+              NSTemporaryExceptionAllowsInsecureHTTPLoads: false,
+              NSTemporaryExceptionRequiresForwardSecrecy: true,
+              NSTemporaryExceptionMinimumTLSVersion: 'TLSv1.2',
+            },
+            'portal.mytelemedicine.com': {
+              NSIncludesSubdomains: false,
+              NSTemporaryExceptionAllowsInsecureHTTPLoads: false,
+              NSTemporaryExceptionRequiresForwardSecrecy: true,
+              NSTemporaryExceptionMinimumTLSVersion: 'TLSv1.2',
+            },
+          },
+        },
       },
     },
     privacyManifests: {
@@ -52,8 +81,9 @@ export default ({ config }) => ({
     },
     android: {
       package: 'com.mpb.health',
-      versionCode: 127,               // ⬅️ bumped (must strictly increase)
+      versionCode: 130,
       targetSdkVersion: 35,
+      proguardFiles: ['./proguard-rules.pro'],
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#ffffff',
@@ -94,13 +124,29 @@ export default ({ config }) => ({
           cameraPermission: 'Allow MPB Health to access your camera.',
         },
       ],
-      [
+        [
         'expo-build-properties',
         {
           android: {
             compileSdkVersion: 35,
             targetSdkVersion: 35,
             buildToolsVersion: '35.0.0',
+            largeHeap: true,
+            usesCleartextTraffic: true,
+            newArchEnabled: true,
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+          },
+          ios: {
+            newArchEnabled: true,
+          },
+        },
+      ],
+      [
+        'expo-system-ui',
+        {
+          android: {
+            enforceNavigationBarContrast: false,
           },
         },
       ],

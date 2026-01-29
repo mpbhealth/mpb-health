@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -9,13 +8,15 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Users, ChevronRight, Calendar, User, CheckCircle } from 'lucide-react-native';
+import { Users, ChevronRight, User, CheckCircle } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
+import { SmartText } from '@/components/common/SmartText';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/lib/supabase';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -29,6 +30,11 @@ interface InactiveDependent {
   product_label: string;
   product_benefit: string;
   agent_id: string;
+  active_date: string | null;
+  inactive_date: string | null;
+  inactive_reason: string | null;
+  is_active: boolean | null;
+  created_date: string | null;
 }
 
 interface ActiveDependent {
@@ -112,15 +118,15 @@ export default function ActivateDependentsScreen() {
       const age = calculateAge(dependent.dob);
       return age >= 18 && age <= 26;
     }
-    return true; // Other relationships can always be activated
+    return true; // Other relationships can always create app login
   };
 
   const handleDependentPress = (dependent: InactiveDependent) => {
     if (!canActivateDependent(dependent)) {
       const age = calculateAge(dependent.dob);
       Alert.alert(
-        'Cannot Activate Account',
-        `Child dependents must be between 18-26 years old to create an account. Current age: ${age} years.`,
+        'Cannot Create App Login',
+        `Child dependents must be between 18-26 years old to create an app login. Current age: ${age} years.`,
         [{ text: 'OK', style: 'default' }]
       );
       return;
@@ -138,7 +144,12 @@ export default function ActivateDependentsScreen() {
         productBenefit: dependent.product_benefit,
         agentId: dependent.agent_id,
         dob: dependent.dob,
-        primaryId: userData.id, // Pass the primary user's auth UUID
+        primaryId: userData.member_id,
+        activeDate: dependent.active_date || '',
+        inactiveDate: dependent.inactive_date || '',
+        inactiveReason: dependent.inactive_reason || '',
+        isActive: dependent.is_active !== null ? String(dependent.is_active) : '',
+        createdDate: dependent.created_date || '',
       },
     });
   };
@@ -153,7 +164,7 @@ export default function ActivateDependentsScreen() {
     <View style={styles.container}>
       <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Activate Dependents</Text>
+        <SmartText variant="h2" style={styles.title} maxLines={1}>Create App Login</SmartText>
       </Animated.View>
 
       <ScrollView
@@ -162,26 +173,26 @@ export default function ActivateDependentsScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <Animated.View style={styles.introCard} entering={FadeInUp.delay(200)}>
-          <Users size={24} color={colors.primary.main} />
+          <Users size={moderateScale(24)} color={colors.primary.main} />
           <View style={styles.introContent}>
-            <Text style={styles.introTitle}>Set Up Dependent Accounts</Text>
-            <Text style={styles.introText}>
-              Activate accounts for your eligible dependents. They'll be able to access their own personalized health portal.
-            </Text>
+            <SmartText variant="h3" style={styles.introTitle} maxLines={2}>Set Up App Access for Dependents</SmartText>
+            <SmartText variant="body1" style={styles.introText} maxLines={3}>
+              Create login credentials for your eligible dependents so they can access their own personalized health portal in the app.
+            </SmartText>
           </View>
         </Animated.View>
 
         {error ? (
           <Animated.View style={styles.errorCard} entering={FadeInUp.delay(300)}>
-            <Text style={styles.errorText}>{error}</Text>
+            <SmartText variant="body1" style={styles.errorText} maxLines={2}>{error}</SmartText>
           </Animated.View>
         ) : totalDependents === 0 ? (
           <Animated.View style={styles.emptyCard} entering={FadeInUp.delay(300)}>
-            <Users size={48} color={colors.gray[300]} />
-            <Text style={styles.emptyTitle}>No Dependents Found</Text>
-            <Text style={styles.emptyText}>
-              You don't have any dependents that need account activation.
-            </Text>
+            <Users size={moderateScale(48)} color={colors.gray[300]} />
+            <SmartText variant="h3" style={styles.emptyTitle} maxLines={1}>No Dependents Found</SmartText>
+            <SmartText variant="body1" style={styles.emptyText} maxLines={2}>
+              You don't have any dependents that need app login setup.
+            </SmartText>
           </Animated.View>
         ) : (
           <View style={styles.dependentsGrid}>
@@ -192,8 +203,8 @@ export default function ActivateDependentsScreen() {
                 style={[styles.dependentCard, styles.activeDependentCard]}
                 onPress={() => {
                   Alert.alert(
-                    'Account Already Active',
-                    `${dependent.first_name} ${dependent.last_name} already has an active account and can sign in to the app.`,
+                    'Login Already Created',
+                    `${dependent.first_name} ${dependent.last_name} already has an app login and can sign in using their credentials.`,
                     [{ text: 'OK', style: 'default' }]
                   );
                 }}
@@ -202,18 +213,18 @@ export default function ActivateDependentsScreen() {
               >
                 <View style={styles.dependentContent}>
                   <View style={[styles.dependentIconContainer, { backgroundColor: `${colors.status.success}15` }]}>
-                    <CheckCircle size={24} color={colors.status.success} />
+                    <CheckCircle size={moderateScale(24)} color={colors.status.success} />
                   </View>
                   <View style={styles.dependentInfo}>
-                    <Text style={styles.dependentName}>
+                    <SmartText variant="h4" style={styles.dependentName} maxLines={1}>
                       {dependent.first_name} {dependent.last_name}
-                    </Text>
-                    <Text style={styles.dependentRelationship}>
-                      {dependent.relationship} • Activated
-                    </Text>
-                    <Text style={styles.activatedText}>
+                    </SmartText>
+                    <SmartText variant="body2" style={styles.dependentRelationship} maxLines={1}>
+                      {dependent.relationship} • Login Created
+                    </SmartText>
+                    <SmartText variant="caption" style={styles.activatedText} maxLines={1}>
                       Can sign in with: {dependent.email}
-                    </Text>
+                    </SmartText>
                   </View>
                 </View>
               </AnimatedTouchableOpacity>
@@ -241,31 +252,39 @@ export default function ActivateDependentsScreen() {
                       styles.dependentIconContainer,
                       { backgroundColor: canActivate ? `${colors.primary.main}15` : `${colors.gray[300]}15` }
                     ]}>
-                      <User size={24} color={canActivate ? colors.primary.main : colors.gray[300]} />
+                      <User size={moderateScale(24)} color={canActivate ? colors.primary.main : colors.gray[300]} />
                     </View>
                     <View style={styles.dependentInfo}>
-                      <Text style={[
-                        styles.dependentName,
-                        !canActivate && styles.dependentNameDisabled
-                      ]}>
+                      <SmartText
+                        variant="h4"
+                        style={[
+                          styles.dependentName,
+                          !canActivate && styles.dependentNameDisabled
+                        ]}
+                        maxLines={1}
+                      >
                         {dependent.first_name} {dependent.last_name}
-                      </Text>
-                      <Text style={[
-                        styles.dependentRelationship,
-                        !canActivate && styles.dependentRelationshipDisabled
-                      ]}>
-                        {dependent.relationship} • Needs Activation
+                      </SmartText>
+                      <SmartText
+                        variant="body2"
+                        style={[
+                          styles.dependentRelationship,
+                          !canActivate && styles.dependentRelationshipDisabled
+                        ]}
+                        maxLines={1}
+                      >
+                        {dependent.relationship} • Login Not Created
                         {age !== null && ` • Age ${age}`}
-                      </Text>
+                      </SmartText>
                       {!canActivate && age !== null && (
-                        <Text style={styles.ageRestrictionText}>
+                        <SmartText variant="caption" style={styles.ageRestrictionText} maxLines={1}>
                           Must be 18-26 years old
-                        </Text>
+                        </SmartText>
                       )}
                     </View>
                   </View>
                   {canActivate && (
-                    <ChevronRight size={20} color={colors.gray[400]} />
+                    <ChevronRight size={moderateScale(20)} color={colors.gray[400]} />
                   )}
                 </AnimatedTouchableOpacity>
               );
@@ -284,88 +303,82 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    padding: responsiveSize.lg,
+    paddingTop: Platform.OS === 'ios' ? moderateScale(60) : moderateScale(40),
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    gap: responsiveSize.sm,
+    ...platformStyles.shadowSm,
   },
   title: {
-    ...typography.h2,
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    flex: 1,
+    minWidth: 0,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    padding: responsiveSize.lg,
+    paddingBottom: responsiveSize.xxl,
   },
   introCard: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
+    padding: responsiveSize.xl,
+    marginBottom: responsiveSize.xl,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    ...shadows.md,
+    gap: responsiveSize.md,
+    ...platformStyles.shadowMd,
   },
   introContent: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs,
   },
   introTitle: {
-    ...typography.h3,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   introText: {
-    ...typography.body1,
     color: colors.text.secondary,
-    lineHeight: 24,
   },
   errorCard: {
     backgroundColor: `${colors.status.error}10`,
     borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
     alignItems: 'center',
   },
   errorText: {
-    ...typography.body1,
     color: colors.status.error,
     textAlign: 'center',
   },
   emptyCard: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
+    padding: responsiveSize.xxl,
     alignItems: 'center',
-    ...shadows.md,
+    gap: responsiveSize.md,
+    ...platformStyles.shadowMd,
   },
   emptyTitle: {
-    ...typography.h3,
     color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
   },
   emptyText: {
-    ...typography.body1,
     color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 24,
   },
   dependentsGrid: {
-    gap: spacing.md,
+    gap: responsiveSize.md,
   },
   dependentCard: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    padding: responsiveSize.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...shadows.md,
+    ...platformStyles.shadowMd,
   },
   dependentCardDisabled: {
     opacity: 0.6,
@@ -379,42 +392,38 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: responsiveSize.sm,
+    minWidth: 0,
   },
   dependentIconContainer: {
-    width: 48,
-    height: 48,
+    width: moderateScale(48),
+    height: moderateScale(48),
     borderRadius: borderRadius.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.md,
   },
   dependentInfo: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
   },
   dependentName: {
-    ...typography.h4,
     color: colors.text.primary,
-    marginBottom: spacing.xs / 2,
   },
   dependentNameDisabled: {
     color: colors.gray[400],
   },
   dependentRelationship: {
-    ...typography.body2,
     color: colors.text.secondary,
   },
   dependentRelationshipDisabled: {
     color: colors.gray[400],
   },
   ageRestrictionText: {
-    ...typography.caption,
     color: colors.status.warning,
-    marginTop: spacing.xs / 2,
   },
   activatedText: {
-    ...typography.caption,
     color: colors.status.success,
-    marginTop: spacing.xs / 2,
   },
 });

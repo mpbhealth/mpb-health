@@ -2,11 +2,11 @@ import React from 'react';
 import {
   View,
   ActivityIndicator,
-  Text,
   StyleSheet,
-  Platform,
 } from 'react-native';
-import { colors, spacing } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { colors } from '@/constants/theme';
+import { responsiveSize } from '@/utils/scaling';
 
 interface LoadingIndicatorProps {
   message?: string;
@@ -24,7 +24,7 @@ export function LoadingIndicator({ message = 'Loading...' }: LoadingIndicatorPro
         color={colors.primary.main}
         style={styles.spinner}
       />
-      <Text style={styles.text}>{message}</Text>
+      <SmartText variant="body1" style={styles.text} maxLines={1}>{message}</SmartText>
     </View>
   );
 }
@@ -38,10 +38,9 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   spinner: {
-    marginBottom: spacing.md,
+    marginBottom: responsiveSize.md,
   },
   text: {
-    fontSize: 16,
     color: colors.text.secondary,
   },
 });

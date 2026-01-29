@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
-import { colors, spacing, borderRadius } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
 
 interface ErrorMessageProps {
   message: string;
@@ -15,8 +17,8 @@ export function ErrorMessage({ message }: ErrorMessageProps) {
       accessibilityRole="alert"
       accessibilityLabel={`Error: ${message}`}
     >
-      <AlertCircle size={16} color={colors.status.error} />
-      <Text style={styles.text}>{message}</Text>
+      <AlertCircle size={moderateScale(16)} color={colors.status.error} />
+      <SmartText variant="body2" style={styles.text} maxLines={2}>{message}</SmartText>
     </View>
   );
 }
@@ -26,14 +28,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: `${colors.status.error}10`,
-    padding: spacing.md,
+    padding: responsiveSize.md,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
+    marginBottom: responsiveSize.md,
+    gap: responsiveSize.sm,
   },
   text: {
     color: colors.status.error,
-    fontSize: 14,
-    marginLeft: spacing.sm,
     flex: 1,
+    minWidth: 0,
   },
 });

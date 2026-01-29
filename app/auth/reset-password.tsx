@@ -139,7 +139,7 @@ export default function ResetPasswordScreen() {
       handleIncomingUrl(url);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((evt, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((evt: any, session: any) => {
       console.log('🔔 Auth state changed:', evt, !!session);
       if (session) {
         setIsValidSession(true);

@@ -44,14 +44,14 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View style={styles.card} entering={FadeInDown.delay(80)}>
-          <Text style={styles.title}>Create App Login</Text>
-          <Text style={styles.subtitle}>
+          <Text style={styles.title} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Create App Login</Text>
+          <Text style={styles.subtitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">
             Taking you to membership verification…
           </Text>
 
           <View style={styles.spinnerRow}>
             <ActivityIndicator size="small" color={colors.primary.main} />
-            <Text style={styles.spinnerText}>Loading</Text>
+            <Text style={styles.spinnerText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Loading</Text>
           </View>
 
           {/* Helpful links in case navigation is interrupted */}
@@ -59,7 +59,7 @@ export default function SignUpScreen() {
             style={styles.supportContainer}
             onPress={() => router.push('/auth/member-support')}
           >
-            <Text style={styles.supportText}>
+            <Text style={styles.supportText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
               Need help? Contact our Concierge team
             </Text>
           </TouchableOpacity>
@@ -68,7 +68,7 @@ export default function SignUpScreen() {
             style={styles.signInContainer}
             onPress={() => router.push('/auth/sign-in')}
           >
-            <Text style={styles.signInText}>
+            <Text style={styles.signInText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
               Already created a login?{' '}
               <Text style={styles.signInLink}>Sign In</Text>
             </Text>
@@ -103,6 +103,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
     marginBottom: spacing.sm,
+    flexShrink: 1,
   },
   subtitle: {
     ...typography.body1,
@@ -110,6 +111,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: spacing.lg,
+    flexShrink: 1,
   },
   spinnerRow: {
     flexDirection: 'row',
@@ -121,14 +123,16 @@ const styles = StyleSheet.create({
   spinnerText: {
     ...typography.body2,
     color: colors.text.secondary,
+    flexShrink: 1,
   },
   supportContainer: { alignItems: 'center', marginBottom: spacing.md },
   supportText: {
     ...typography.body2,
     color: colors.primary.main,
     textDecorationLine: 'underline',
+    flexShrink: 1,
   },
   signInContainer: { alignItems: 'center' },
-  signInText: { ...typography.body2, color: colors.text.secondary },
+  signInText: { ...typography.body2, color: colors.text.secondary, flexShrink: 1 },
   signInLink: { color: colors.primary.main, fontWeight: '600' },
 });

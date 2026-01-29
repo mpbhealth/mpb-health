@@ -7,6 +7,8 @@ import { colors } from '@/constants/theme';
 
 type CareServiceRow = Database['public']['Tables']['care_services']['Row'];
 
+const SECOND_OPINION_PRODUCT_IDS = ['43957', '44036'];
+
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
   const int = parseInt(clean, 16);
@@ -28,7 +30,7 @@ export type CareService = {
   displayOrder: number;
 };
 
-export function useCareServices() {
+export function useCareServices(userProductId?: string | null) {
   const [services, setServices] = useState<CareService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export function useCareServices() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userProductId]);
 
   async function fetchServices() {
     try {
@@ -70,7 +72,14 @@ export function useCareServices() {
         throw fetchError;
       }
 
-      const mappedServices: CareService[] = (data || []).map((service: CareServiceRow, index: number) => {
+      const filteredData = (data || []).filter((service: CareServiceRow) => {
+        if (service.service_key === 'second-md') {
+          return userProductId && SECOND_OPINION_PRODUCT_IDS.includes(userProductId);
+        }
+        return true;
+      });
+
+      const mappedServices: CareService[] = filteredData.map((service: CareServiceRow, index: number) => {
         const isBlue = index % 2 === 0;
         const color = isBlue ? colors.primary.main : colors.secondary.main;
         const gradient = rgbaFromHex(color, 0.15);

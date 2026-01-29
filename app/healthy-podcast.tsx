@@ -1,38 +1,30 @@
-// src/screens/HealthyPodcastScreen.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Play, Calendar, ExternalLink } from 'lucide-react-native';
-import Animated, { 
-  FadeInDown, 
+import Animated, {
+  FadeInDown,
   FadeInUp,
   Layout,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
-  SlideInRight
 } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { supabase } from '@/lib/supabase';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  colors,
-  shadows,
-  typography,
-  spacing,
-  borderRadius,
-} from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -43,7 +35,6 @@ interface Video {
   published_date_time: string;
 }
 
-// Enhanced video card component with uniform sizing
 function VideoCard({ video, index, onPress }: { video: Video, index: number, onPress: () => void }) {
   const [expandedDescription, setExpandedDescription] = useState(false);
   const scale = useSharedValue(1);
@@ -55,7 +46,6 @@ function VideoCard({ video, index, onPress }: { video: Video, index: number, onP
       { scale: scale.value },
       { translateY: translateY.value }
     ],
-    // this helps iOS feel nice; Android won't use this for visuals
     shadowOpacity: shadowOpacity.value,
   }));
 
@@ -82,7 +72,7 @@ function VideoCard({ video, index, onPress }: { video: Video, index: number, onP
 
   return (
     <AnimatedTouchableOpacity
-      style={[styles.videoCard, styles.surface, animatedStyle]}
+      style={[styles.videoCard, animatedStyle]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -92,39 +82,40 @@ function VideoCard({ video, index, onPress }: { video: Video, index: number, onP
     >
       <View style={styles.videoContent}>
         <View style={styles.videoIconContainer}>
-          <Play size={28} color={colors.primary.main} />
+          <Play size={moderateScale(24)} color={colors.primary.main} />
         </View>
 
         <View style={styles.videoInfo}>
-          <Text style={styles.videoTitle} numberOfLines={2}>
+          <SmartText variant="body1" style={styles.videoTitle}>
             {video.video_title}
-          </Text>
-          
-          <Text
+          </SmartText>
+
+          <SmartText
+            variant="body2"
             style={styles.videoDescription}
             numberOfLines={expandedDescription ? undefined : 2}
           >
             {video.video_description}
-          </Text>
+          </SmartText>
 
           {video.video_description?.length > 100 && (
             <TouchableOpacity onPress={() => setExpandedDescription(v => !v)} style={styles.expandButton}>
-              <Text style={styles.expandButtonText}>
+              <SmartText variant="caption" style={styles.expandButtonText}>
                 {expandedDescription ? 'Show less' : 'Show more'}
-              </Text>
+              </SmartText>
             </TouchableOpacity>
           )}
 
           <View style={styles.videoMeta}>
-            <Calendar size={16} color={colors.text.secondary} />
-            <Text style={styles.videoDate}>
+            <Calendar size={moderateScale(14)} color={colors.text.secondary} />
+            <SmartText variant="caption" style={styles.videoDate}>
               {formatDate(video.published_date_time)}
-            </Text>
+            </SmartText>
           </View>
         </View>
 
         <View style={styles.chevronContainer}>
-          <ExternalLink size={20} color={colors.primary.main} />
+          <ExternalLink size={moderateScale(18)} color={colors.primary.main} />
         </View>
       </View>
     </AnimatedTouchableOpacity>
@@ -133,9 +124,7 @@ function VideoCard({ video, index, onPress }: { video: Video, index: number, onP
 
 export default function HealthyPodcastScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
+  const { isTablet } = useResponsive();
 
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,65 +167,58 @@ export default function HealthyPodcastScreen() {
     <View style={styles.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={[
-          styles.header,
-          styles.surface,
-          { paddingTop: Platform.OS === 'ios' ? insets.top + spacing.lg : spacing.xl },
-        ]}
+        style={styles.header}
       >
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Healthy Podcast</Text>
+          <SmartText variant="h2" style={styles.headerTitle}>Healthy Podcast</SmartText>
         </View>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xl }
-        ]}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Animated.Text 
-          style={styles.description} 
-          entering={FadeInUp.delay(200)}
-        >
-          Watch our latest health and wellness videos to stay informed and live a healthier life.
-        </Animated.Text>
-
-        {error ? (
-          <Animated.View 
-            style={[styles.errorContainer, styles.surface]}
-            entering={FadeInUp.delay(300)}
-          >
-            <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <SmartText variant="body1" style={styles.description}>
+              Watch our latest health and wellness videos to stay informed and live a healthier life.
+            </SmartText>
           </Animated.View>
-        ) : (
-          <View style={[styles.videosGrid, isTablet && styles.videosGridTablet]}>
-            {videos.map((video, index) => (
-              <VideoCard
-                key={video.video_url}
-                video={video}
-                index={index}
-                onPress={() => handleVideoPress(video)}
-              />
-            ))}
-          </View>
-        )}
 
-        {videos.length === 0 && !error && !loading && (
-          <Animated.View 
-            style={styles.emptyState}
-            entering={FadeInUp.delay(300)}
-          >
-            <Play size={48} color={colors.gray[300]} />
-            <Text style={styles.emptyTitle}>No Videos Available</Text>
-            <Text style={styles.emptyText}>
-              Check back soon for new health and wellness content.
-            </Text>
-          </Animated.View>
-        )}
+          {error ? (
+            <Animated.View entering={FadeInUp.delay(300)}>
+              <Card padding="lg" variant="outlined" style={styles.errorContainer}>
+                <SmartText variant="body1" style={styles.errorText}>{error}</SmartText>
+              </Card>
+            </Animated.View>
+          ) : (
+            <View style={styles.videosGrid}>
+              {videos.map((video, index) => (
+                <VideoCard
+                  key={video.video_url}
+                  video={video}
+                  index={index}
+                  onPress={() => handleVideoPress(video)}
+                />
+              ))}
+            </View>
+          )}
+
+          {videos.length === 0 && !error && !loading && (
+            <Animated.View
+              style={styles.emptyState}
+              entering={FadeInUp.delay(300)}
+            >
+              <Play size={moderateScale(48)} color={colors.gray[300]} />
+              <SmartText variant="h3" style={styles.emptyTitle}>No Videos Available</SmartText>
+              <SmartText variant="body1" style={styles.emptyText}>
+                Check back soon for new health and wellness content.
+              </SmartText>
+            </Animated.View>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -248,30 +230,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.paper,
   },
 
-  // One reusable "surface" for Android/iOS parity
-  surface: Platform.select({
-    android: {
-      elevation: 3,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: 'rgba(0,0,0,0.07)',
-    },
-    ios: { ...shadows.md },
-    default: {},
-  }),
-
   header: {
     backgroundColor: colors.background.default,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    padding: responsiveSize.md,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
+    ...platformStyles.shadowSm,
   },
   headerContent: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   headerTitle: {
-    ...typography.h2,
     fontWeight: '700',
     color: colors.text.primary,
   },
@@ -280,119 +251,111 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
   },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   description: {
-    ...typography.body1,
-    fontWeight: '400',
     color: colors.text.secondary,
-    marginBottom: spacing.xl,
-    lineHeight: 24,
+    marginBottom: responsiveSize.lg,
   },
 
   videosGrid: {
-    gap: spacing.md,
-  },
-  videosGridTablet: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: responsiveSize.md,
   },
 
   videoCard: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    marginBottom: spacing.md,
-    minHeight: 120, // Uniform container size
+    borderRadius: borderRadius.lg,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
   videoContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.lg,
-    gap: spacing.md,
-    minHeight: 120, // Ensures uniform height
+    padding: responsiveSize.md,
+    gap: responsiveSize.sm,
+    minHeight: MIN_TOUCH_TARGET,
   },
 
-  // No shadows on these small elements (prevents dark blobs on Android)
   videoIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.xl,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: borderRadius.md,
     backgroundColor: `${colors.primary.main}15`,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   chevronContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: borderRadius.md,
     backgroundColor: `${colors.primary.main}15`,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
 
   videoInfo: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
   },
   videoTitle: {
-    ...typography.h4,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
-    lineHeight: 22,
   },
   videoDescription: {
-    ...typography.body2,
-    fontWeight: '400',
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
-    lineHeight: 20,
   },
   expandButton: {
-    marginBottom: spacing.sm,
+    marginTop: responsiveSize.xs / 4,
   },
   expandButtonText: {
-    ...typography.caption,
     color: colors.primary.main,
     fontWeight: '500',
   },
   videoMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: responsiveSize.xs / 2,
+    marginTop: responsiveSize.xs / 4,
   },
   videoDate: {
-    ...typography.caption,
     color: colors.text.secondary,
-    fontWeight: '400',
   },
 
   errorContainer: {
     backgroundColor: `${colors.status.error}10`,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    borderColor: `${colors.status.error}30`,
     alignItems: 'center',
   },
   errorText: {
-    ...typography.body1,
     color: colors.status.error,
     textAlign: 'center',
   },
+
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
-    gap: spacing.md,
+    paddingVertical: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   emptyTitle: {
-    ...typography.h3,
     color: colors.text.primary,
     fontWeight: '600',
   },
   emptyText: {
-    ...typography.body1,
     color: colors.text.secondary,
     textAlign: 'center',
-    maxWidth: 300,
-    lineHeight: 24,
+    maxWidth: moderateScale(300),
   },
 });

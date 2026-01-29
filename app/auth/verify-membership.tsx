@@ -35,6 +35,11 @@ type MemberRow = {
   is_primary: boolean | null;
   relationship: string | null;
   primary_id: string | number | null;
+  active_date: string | null;
+  inactive_date: string | null;
+  inactive_reason: string | null;
+  is_active: boolean | null;
+  created_date: string | null;
 };
 
 // ---------- utilities ----------
@@ -178,6 +183,8 @@ export default function VerifyMembershipScreen() {
   // ---------- route to create ----------
   const pushToCreate = (member: MemberRow) => {
     const formattedDob = member.dob ? formatDateForStorage(member.dob) : '';
+    const formattedActiveDate = member.active_date ? formatDateForStorage(member.active_date) : '';
+    const formattedInactiveDate = member.inactive_date ? formatDateForStorage(member.inactive_date) : '';
     router.push({
       pathname: '/auth/create-account',
       params: {
@@ -193,6 +200,11 @@ export default function VerifyMembershipScreen() {
         isPrimary: String(Boolean(member.is_primary)),
         relationship: String(member.relationship ?? ''),
         primaryId: String(member.primary_id ?? ''),
+        activeDate: formattedActiveDate,
+        inactiveDate: formattedInactiveDate,
+        inactiveReason: String(member.inactive_reason ?? ''),
+        isActive: String(member.is_active ?? ''),
+        createdDate: String(member.created_date ?? ''),
       },
     });
   };
@@ -242,9 +254,9 @@ export default function VerifyMembershipScreen() {
         // 2) Find membership
         const { data: member, error: memberError } = await supabase
           .from('members')
-          .select('*')
+          .select('member_id, first_name, last_name, product_id, product_label, product_benefit, agent_id, dob, email, is_primary, relationship, primary_id, active_date, inactive_date, inactive_reason, is_active, created_date')
           .eq('member_id', memberId.trim())
-          .maybeSingle<MemberRow>();
+          .maybeSingle() as { data: MemberRow | null; error: any };
         if (memberError) throw memberError;
         if (!member) {
           setAttempts((p) => p + 1);
@@ -264,7 +276,91 @@ export default function VerifyMembershipScreen() {
           return;
         }
 
-        // 4) Good → go create
+        // 4) Check if dependent email matches primary email (check both members and users tables)
+        if (member.is_primary === false && hasEmail && member.primary_id) {
+          console.log('[DEBUG] Checking dependent email against primary...', {
+            dependentEmail: member.email,
+            primaryId: member.primary_id
+          });
+
+          const { data: primaryMember, error: primaryErr } = await supabase
+            .from('members')
+            .select('email')
+            .eq('member_id', member.primary_id)
+            .maybeSingle();
+          if (primaryErr) throw primaryErr;
+
+          const { data: primaryUser, error: primaryUserErr } = await supabase
+            .from('users')
+            .select('email')
+            .eq('member_id', member.primary_id)
+            .maybeSingle();
+          if (primaryUserErr) throw primaryUserErr;
+
+          const dependentEmailNorm = safeLower(member.email ?? '');
+          const primaryMemberEmailNorm = safeLower(primaryMember?.email ?? '');
+          const primaryUserEmailNorm = safeLower(primaryUser?.email ?? '');
+
+          console.log('[DEBUG] Email comparison:', {
+            dependentEmailNorm,
+            primaryMemberEmailNorm,
+            primaryUserEmailNorm,
+            matchesMemberTable: dependentEmailNorm === primaryMemberEmailNorm,
+            matchesUserTable: dependentEmailNorm === primaryUserEmailNorm
+          });
+
+          if (
+            (primaryMemberEmailNorm && dependentEmailNorm === primaryMemberEmailNorm) ||
+            (primaryUserEmailNorm && dependentEmailNorm === primaryUserEmailNorm)
+          ) {
+            console.log('[DEBUG] Email match detected! Showing email input modal...');
+            setDependentMember(member);
+            setShowEmailInput(true);
+            setNotice('Your email matches the primary member. Please enter a different email for your login.');
+            return;
+          }
+        }
+
+        // 5) Check if email is already taken by ANY user (not just primary)
+        if (hasEmail) {
+          const { data: emailTaken, error: emailErr } = await supabase
+            .from('users')
+            .select('id, email')
+            .ilike('email', safeLower(member.email ?? ''))
+            .maybeSingle();
+          if (emailErr) throw emailErr;
+          if (emailTaken) {
+            setDependentMember(member);
+            setShowEmailInput(true);
+            setNotice('This email is already in use. Please enter a different email for your login.');
+            return;
+          }
+
+          // 6) Check if email exists in Supabase Auth
+          const checkAuthUrl = `${supabase.supabaseUrl}/functions/v1/check-email-exists`;
+          const authCheckRes = await fetch(checkAuthUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabase.supabaseKey}`,
+            },
+            body: JSON.stringify({ email: safeLower(member.email ?? '') }),
+          });
+
+          if (!authCheckRes.ok) {
+            throw new Error('Failed to verify email availability');
+          }
+
+          const { exists: authExists } = await authCheckRes.json();
+          if (authExists) {
+            setDependentMember(member);
+            setShowEmailInput(true);
+            setNotice('This email is already registered. Please enter a different email for your login.');
+            return;
+          }
+        }
+
+        // 7) Good → go create
         pushToCreate({ ...member, email: safeLower(member.email ?? '') });
       } else {
         // email + dob path
@@ -286,14 +382,81 @@ export default function VerifyMembershipScreen() {
         // 2) Verify membership
         const { data: member, error: memberError } = await supabase
           .from('members')
-          .select('*')
+          .select('member_id, first_name, last_name, product_id, product_label, product_benefit, agent_id, dob, email, is_primary, relationship, primary_id, active_date, inactive_date, inactive_reason, is_active, created_date')
           .ilike('email', emailLower)
           .eq('dob', dobString)
-          .maybeSingle<MemberRow>();
+          .maybeSingle() as { data: MemberRow | null; error: any };
         if (memberError) throw memberError;
         if (!member) {
           setAttempts((p) => p + 1);
           setError('No membership found with this email and date of birth. Please verify or contact support.');
+          return;
+        }
+
+        // 3) Check if dependent email matches primary email (check both members and users tables)
+        if (member.is_primary === false && member.primary_id) {
+          const { data: primaryMember, error: primaryErr } = await supabase
+            .from('members')
+            .select('email')
+            .eq('member_id', member.primary_id)
+            .maybeSingle();
+          if (primaryErr) throw primaryErr;
+
+          const { data: primaryUser, error: primaryUserErr } = await supabase
+            .from('users')
+            .select('email')
+            .eq('member_id', member.primary_id)
+            .maybeSingle();
+          if (primaryUserErr) throw primaryUserErr;
+
+          const primaryMemberEmailNorm = safeLower(primaryMember?.email ?? '');
+          const primaryUserEmailNorm = safeLower(primaryUser?.email ?? '');
+
+          if (
+            (primaryMemberEmailNorm && emailLower === primaryMemberEmailNorm) ||
+            (primaryUserEmailNorm && emailLower === primaryUserEmailNorm)
+          ) {
+            setDependentMember(member);
+            setShowEmailInput(true);
+            setNotice('This email belongs to the primary member. Please enter a different email for your login.');
+            return;
+          }
+        }
+
+        // 4) Check if email is already taken by ANY user (not just primary)
+        const { data: emailTaken, error: emailErr } = await supabase
+          .from('users')
+          .select('id, email')
+          .ilike('email', emailLower)
+          .maybeSingle();
+        if (emailErr) throw emailErr;
+        if (emailTaken) {
+          setDependentMember(member);
+          setShowEmailInput(true);
+          setNotice('This email is already in use. Please enter a different email for your login.');
+          return;
+        }
+
+        // 5) Check if email exists in Supabase Auth
+        const checkAuthUrl = `${supabase.supabaseUrl}/functions/v1/check-email-exists`;
+        const authCheckRes = await fetch(checkAuthUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+          },
+          body: JSON.stringify({ email: emailLower }),
+        });
+
+        if (!authCheckRes.ok) {
+          throw new Error('Failed to verify email availability');
+        }
+
+        const { exists: authExists } = await authCheckRes.json();
+        if (authExists) {
+          setDependentMember(member);
+          setShowEmailInput(true);
+          setNotice('This email is already registered. Please enter a different email for your login.');
           return;
         }
 
@@ -328,6 +491,34 @@ export default function VerifyMembershipScreen() {
 
       setIsLoading(true);
 
+      // Check if this email matches the primary member's email (check both members and users tables)
+      if (dependentMember.primary_id) {
+        const { data: primaryMember, error: primaryErr } = await supabase
+          .from('members')
+          .select('email')
+          .eq('member_id', dependentMember.primary_id)
+          .maybeSingle();
+        if (primaryErr) throw primaryErr;
+
+        const { data: primaryUser, error: primaryUserErr } = await supabase
+          .from('users')
+          .select('email')
+          .eq('member_id', dependentMember.primary_id)
+          .maybeSingle();
+        if (primaryUserErr) throw primaryUserErr;
+
+        const primaryMemberEmailNorm = safeLower(primaryMember?.email ?? '');
+        const primaryUserEmailNorm = safeLower(primaryUser?.email ?? '');
+
+        if (
+          (primaryMemberEmailNorm && dependentEmailLower === primaryMemberEmailNorm) ||
+          (primaryUserEmailNorm && dependentEmailLower === primaryUserEmailNorm)
+        ) {
+          setError('This email belongs to the primary member. Please use a different email address for your login.');
+          return;
+        }
+      }
+
       // Prevent email collisions: if email already belongs to another user, block
       const { data: emailTaken, error: emailErr } = await supabase
         .from('users')
@@ -337,6 +528,27 @@ export default function VerifyMembershipScreen() {
       if (emailErr) throw emailErr;
       if (emailTaken) {
         setError('This email is already in use. Please use a different email address.');
+        return;
+      }
+
+      // Check if email exists in Supabase Auth
+      const checkAuthUrl = `${supabase.supabaseUrl}/functions/v1/check-email-exists`;
+      const authCheckRes = await fetch(checkAuthUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({ email: dependentEmailLower }),
+      });
+
+      if (!authCheckRes.ok) {
+        throw new Error('Failed to verify email availability');
+      }
+
+      const { exists: authExists } = await authCheckRes.json();
+      if (authExists) {
+        setError('This email is already registered. Please use a different email address.');
         return;
       }
 
@@ -361,26 +573,31 @@ export default function VerifyMembershipScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View entering={FadeInDown.delay(120)} style={styles.card}>
-          <Text style={styles.title}>Create App Login</Text>
-          <Text style={styles.subtitle}>
+          <Text style={styles.title} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Create App Login</Text>
+          <Text style={styles.subtitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">
             Verify your membership to set up your app login.
           </Text>
 
           {!!notice && !error && (
             <View style={styles.noticeContainer}>
-              <Text style={styles.noticeText}>{notice}</Text>
+              <Text style={styles.noticeText} allowFontScaling={false}>{notice}</Text>
             </View>
           )}
           {!!error && (
             <View style={styles.errorContainer} accessibilityLiveRegion="polite">
               <AlertCircle size={20} color={colors.status.error} style={styles.errorIcon} />
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText} allowFontScaling={false} numberOfLines={3} ellipsizeMode="tail">{error}</Text>
               {locked && (
-                <Text style={styles.helperText}>
+                <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
                   Locked due to too many attempts. Try again in {secondsLeft}s.
                 </Text>
               )}
@@ -390,15 +607,15 @@ export default function VerifyMembershipScreen() {
           {showEmailInput ? (
             <>
               <View style={styles.dependentInfoCard}>
-                <Text style={styles.dependentInfoTitle}>Almost there!</Text>
-                <Text style={styles.dependentInfoText}>
+                <Text style={styles.dependentInfoTitle} allowFontScaling={false}>Almost there!</Text>
+                <Text style={styles.dependentInfoText} allowFontScaling={false}>
                   We found the membership for {dependentMember?.first_name} {dependentMember?.last_name}.{"\n"}
                   Add an email to use for your app login.
                 </Text>
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email Address</Text>
+                <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Email Address</Text>
                 <TextInput
                   style={[styles.input, error ? styles.inputError : null]}
                   value={dependentEmail}
@@ -414,7 +631,7 @@ export default function VerifyMembershipScreen() {
                   accessibilityLabel="Dependent email address"
                   placeholderTextColor={colors.text.secondary}
                 />
-                <Text style={styles.helperText}>This will be your login email for the app</Text>
+                <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">This will be your login email for the app</Text>
               </View>
 
               <TouchableOpacity
@@ -422,7 +639,7 @@ export default function VerifyMembershipScreen() {
                 onPress={handleAddDependentEmail}
                 disabled={isLoading || locked}
               >
-                <Text style={styles.verifyButtonText}>
+                <Text style={styles.verifyButtonText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
                   {isLoading ? 'Adding Email...' : 'Continue with Email'}
                 </Text>
               </TouchableOpacity>
@@ -437,7 +654,7 @@ export default function VerifyMembershipScreen() {
                   setNotice(null);
                 }}
               >
-                <Text style={styles.backButtonText}>← Back</Text>
+                <Text style={styles.backButtonText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">← Back</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -467,6 +684,9 @@ export default function VerifyMembershipScreen() {
                       styles.toggleButtonText,
                       verificationMethod === 'memberId' && styles.toggleButtonTextActive,
                     ]}
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
                     Member ID
                   </Text>
@@ -494,6 +714,9 @@ export default function VerifyMembershipScreen() {
                       styles.toggleButtonText,
                       verificationMethod === 'emailDob' && styles.toggleButtonTextActive,
                     ]}
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
                     Email & DOB
                   </Text>
@@ -503,7 +726,7 @@ export default function VerifyMembershipScreen() {
               {/* Member ID */}
               {verificationMethod === 'memberId' && (
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Member ID</Text>
+                  <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Member ID</Text>
                   <TextInput
                     style={[styles.input, error ? styles.inputError : null]}
                     value={memberId}
@@ -525,7 +748,7 @@ export default function VerifyMembershipScreen() {
               {verificationMethod === 'emailDob' && (
                 <>
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Email Address</Text>
+                    <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Email Address</Text>
                     <TextInput
                       style={[styles.input, error ? styles.inputError : null]}
                       value={email}
@@ -542,11 +765,11 @@ export default function VerifyMembershipScreen() {
                       accessibilityLabel="Email address"
                       placeholderTextColor={colors.text.secondary}
                     />
-                    <Text style={styles.helperText}>We’ll use this for your login.</Text>
+                    <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">We'll use this for your login.</Text>
                   </View>
 
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Date of Birth</Text>
+                    <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Date of Birth</Text>
                     <View style={[styles.dateInputContainer, error ? styles.inputError : null]}>
                       <TextInput
                         style={styles.dateInput}
@@ -562,7 +785,7 @@ export default function VerifyMembershipScreen() {
                         <Calendar size={20} color={colors.primary.main} />
                       </TouchableOpacity>
                     </View>
-                    <Text style={styles.helperText}>Enter manually or tap the calendar</Text>
+                    <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Enter manually or tap the calendar</Text>
                   </View>
 
                   {showDatePicker && Platform.OS === 'android' && (
@@ -585,9 +808,9 @@ export default function VerifyMembershipScreen() {
                       <Pressable style={styles.modalBackdrop} onPress={() => setShowDatePicker(false)} />
                       <View style={styles.pickerSheet}>
                         <View style={styles.pickerHeader}>
-                          <Text style={styles.pickerTitle}>Select Date of Birth</Text>
+                          <Text style={styles.pickerTitle} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Select Date of Birth</Text>
                           <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.pickerDoneBtn}>
-                            <Text style={styles.pickerDoneText}>Done</Text>
+                            <Text style={styles.pickerDoneText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Done</Text>
                           </TouchableOpacity>
                         </View>
                         <DateTimePicker
@@ -613,7 +836,7 @@ export default function VerifyMembershipScreen() {
                 onPress={handleVerifyMembership}
                 disabled={isLoading || locked}
               >
-                <Text style={styles.verifyButtonText}>
+                <Text style={styles.verifyButtonText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
                   {isLoading ? 'Verifying...' : 'Continue'}
                 </Text>
               </TouchableOpacity>
@@ -623,10 +846,10 @@ export default function VerifyMembershipScreen() {
           {!showEmailInput && (
             <>
               <TouchableOpacity style={styles.supportContainer} onPress={() => router.push('/auth/member-support')}>
-                <Text style={styles.supportText}>Need help? Contact our Concierge team</Text>
+                <Text style={styles.supportText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Need help? Contact our Concierge team</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.signInContainer} onPress={() => router.push('/auth/sign-in')}>
-                <Text style={styles.signInText}>
+                <Text style={styles.signInText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
                   Already created a login? <Text style={styles.signInLink}>Sign In</Text>
                 </Text>
               </TouchableOpacity>
@@ -652,30 +875,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray[100],
   },
-  title: { ...typography.h2, fontWeight: '700' as const, color: colors.text.primary, textAlign: 'center' as const, marginBottom: spacing.sm },
-  subtitle: { ...typography.body1, color: colors.text.secondary, textAlign: 'center' as const, lineHeight: 22, marginBottom: spacing.xl },
+  title: { ...typography.h2, fontWeight: '700' as const, color: colors.text.primary, textAlign: 'center' as const, marginBottom: spacing.sm, flexShrink: 1 },
+  subtitle: { ...typography.body1, color: colors.text.secondary, textAlign: 'center' as const, lineHeight: 22, marginBottom: spacing.xl, flexShrink: 1 },
 
-  noticeContainer: { backgroundColor: `${colors.primary.main}10`, padding: spacing.md, borderRadius: borderRadius.lg, marginBottom: spacing.lg },
-  noticeText: { ...typography.body2, color: colors.primary.main },
+  noticeContainer: { backgroundColor: `${colors.primary.main}10`, padding: spacing.md, borderRadius: borderRadius.lg, marginBottom: spacing.lg, overflow: 'hidden' },
+  noticeText: { ...typography.body2, color: colors.primary.main, flexShrink: 1 },
 
   dependentInfoCard: { backgroundColor: `${colors.primary.main}08`, borderRadius: borderRadius.lg, padding: spacing.lg, marginBottom: spacing.xl },
   dependentInfoTitle: { ...typography.h3, color: colors.primary.main, marginBottom: spacing.xs, textAlign: 'center' },
-  dependentInfoText: { ...typography.body1, color: colors.primary.main, textAlign: 'center', lineHeight: 22 },
+  dependentInfoText: { ...typography.body1, color: colors.primary.main, textAlign: 'center', lineHeight: 22, flexWrap: 'wrap' },
 
   toggleContainer: { flexDirection: 'row', backgroundColor: colors.background.paper, borderRadius: borderRadius.lg, padding: spacing.xs, marginBottom: spacing.xl },
   toggleButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, gap: spacing.xs },
   toggleButtonLeft: { marginRight: spacing.xs / 2 },
   toggleButtonRight: { marginLeft: spacing.xs / 2 },
   toggleButtonActive: { backgroundColor: colors.primary.main, ...shadows.sm },
-  toggleButtonText: { ...typography.body2, fontWeight: '600' as const, color: colors.text.secondary },
+  toggleButtonText: { ...typography.body2, fontWeight: '600' as const, color: colors.text.secondary, flexShrink: 1 },
   toggleButtonTextActive: { color: colors.background.default },
 
-  errorContainer: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: `${colors.status.error}10`, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.lg },
+  errorContainer: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: `${colors.status.error}10`, borderRadius: borderRadius.lg, padding: spacing.md, marginBottom: spacing.lg, overflow: 'hidden' },
   errorIcon: { marginRight: spacing.sm, marginTop: 2 },
-  errorText: { flex: 1, ...typography.body2, color: colors.status.error },
+  errorText: { flex: 1, ...typography.body2, color: colors.status.error, flexShrink: 1 },
 
   inputContainer: { marginBottom: spacing.lg },
-  label: { ...typography.body2, fontWeight: '600' as const, color: colors.text.primary, marginBottom: spacing.xs },
+  label: { ...typography.body2, fontWeight: '600' as const, color: colors.text.primary, marginBottom: spacing.xs, flexShrink: 1 },
   input: { backgroundColor: colors.background.paper, borderWidth: 1, borderColor: colors.gray[200], borderRadius: borderRadius.lg, padding: spacing.md, ...typography.body1, color: colors.text.primary },
   inputError: { borderColor: colors.status.error },
 
@@ -683,27 +906,27 @@ const styles = StyleSheet.create({
   dateInput: { flex: 1, padding: spacing.md, ...typography.body1, color: colors.text.primary },
   calendarButton: { padding: spacing.md, marginLeft: spacing.xs },
 
-  helperText: { ...typography.caption, color: colors.text.secondary, marginTop: spacing.xs },
+  helperText: { ...typography.caption, color: colors.text.secondary, marginTop: spacing.xs, flexShrink: 1 },
 
   verifyButton: { backgroundColor: colors.primary.main, paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center' as const, marginBottom: spacing.xl, ...shadows.md },
   buttonDisabled: { opacity: 0.6 },
-  verifyButtonText: { ...typography.body1, fontWeight: '700' as const, color: colors.background.default },
+  verifyButtonText: { ...typography.body1, fontWeight: '700' as const, color: colors.background.default, flexShrink: 1 },
 
   backButton: { alignItems: 'center', marginBottom: spacing.lg },
-  backButtonText: { ...typography.body2, color: colors.text.secondary, textDecorationLine: 'underline' },
+  backButtonText: { ...typography.body2, color: colors.text.secondary, textDecorationLine: 'underline', flexShrink: 1 },
 
   supportContainer: { alignItems: 'center', marginBottom: spacing.md },
-  supportText: { ...typography.body2, color: colors.primary.main, textDecorationLine: 'underline' },
+  supportText: { ...typography.body2, color: colors.primary.main, textDecorationLine: 'underline', flexShrink: 1 },
   signInContainer: { alignItems: 'center' },
-  signInText: { ...typography.body2, color: colors.text.secondary },
+  signInText: { ...typography.body2, color: colors.text.secondary, flexShrink: 1 },
   signInLink: { color: colors.primary.main, fontWeight: '700' as const },
 
   // iOS picker modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   pickerSheet: { backgroundColor: colors.background.default, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, paddingBottom: Platform.OS === 'ios' ? spacing.lg : 0 },
   pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.gray[100] },
-  pickerTitle: { ...typography.body1, color: colors.text.primary, fontWeight: '700' as const },
+  pickerTitle: { ...typography.body1, color: colors.text.primary, fontWeight: '700' as const, flexShrink: 1 },
   pickerDoneBtn: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, backgroundColor: colors.primary.main },
-  pickerDoneText: { ...typography.body2, color: colors.background.default, fontWeight: '700' as const },
+  pickerDoneText: { ...typography.body2, color: colors.background.default, fontWeight: '700' as const, flexShrink: 1 },
   iosPicker: { backgroundColor: colors.background.default },
 });

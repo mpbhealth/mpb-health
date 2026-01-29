@@ -1,13 +1,16 @@
-import { View, Text, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Key, Mail, ChevronRight, Shield, Lock } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-// Helper to convert HEX → RGBA
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
   const int = parseInt(clean, 16);
@@ -19,6 +22,7 @@ function rgbaFromHex(hex: string, alpha: number) {
 
 export default function SecuritySettingsScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
 
   const securityOptions = [
     {
@@ -41,57 +45,58 @@ export default function SecuritySettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View 
+      <Animated.View
         style={styles.header}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Security Settings</Text>
+        <SmartText variant="h2" style={styles.title}>Security Settings</SmartText>
       </Animated.View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Animated.View 
-          style={styles.introCard}
-          entering={FadeInUp.delay(200)}
-        >
-          <View style={styles.introIconContainer}>
-            <Lock size={24} color={colors.primary.main} />
-          </View>
-          <View style={styles.introContent}>
-            <Text style={styles.introTitle}>Account Security</Text>
-            <Text style={styles.introText}>
-              Protect your account by regularly updating your security settings. Use a strong password and keep your email address up to date.
-            </Text>
-          </View>
-        </Animated.View>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <Card padding="lg" style={styles.introCard}>
+              <View style={styles.introIconContainer}>
+                <Lock size={moderateScale(22)} color={colors.primary.main} />
+              </View>
+              <View style={styles.introContent}>
+                <SmartText variant="h3" style={styles.introTitle}>Account Security</SmartText>
+                <SmartText variant="body1" style={styles.introText}>
+                  Protect your account by regularly updating your security settings. Use a strong password and keep your email address up to date.
+                </SmartText>
+              </View>
+            </Card>
+          </Animated.View>
 
-        <View style={styles.optionsGrid}>
-          {securityOptions.map((option, index) => (
-            <AnimatedTouchableOpacity
-              key={option.title}
-              style={styles.optionCard}
-              onPress={() => router.push(option.route as never)}
-              entering={FadeInUp.delay(300 + index * 100)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.optionContent}>
-                <View style={[styles.iconContainer, { backgroundColor: option.gradient }]}>
-                  <option.icon size={28} color={option.color} />
+          <View style={styles.optionsGrid}>
+            {securityOptions.map((option, index) => (
+              <AnimatedTouchableOpacity
+                key={option.title}
+                style={styles.optionCard}
+                onPress={() => router.push(option.route as never)}
+                entering={FadeInUp.delay(300 + index * 100)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.optionContent}>
+                  <View style={[styles.iconContainer, { backgroundColor: option.gradient }]}>
+                    <option.icon size={moderateScale(24)} color={option.color} />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <SmartText variant="body1" style={styles.optionTitle}>{option.title}</SmartText>
+                    <SmartText variant="body2" style={styles.optionDescription}>{option.description}</SmartText>
+                  </View>
                 </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.optionTitle}>{option.title}</Text>
-                  <Text style={styles.optionDescription}>{option.description}</Text>
+                <View style={[styles.chevronContainer, { backgroundColor: option.gradient }]}>
+                  <ChevronRight size={moderateScale(18)} color={option.color} />
                 </View>
-              </View>
-              <View style={[styles.chevronContainer, { backgroundColor: option.gradient }]}>
-                <ChevronRight size={20} color={option.color} />
-              </View>
-            </AnimatedTouchableOpacity>
-          ))}
+              </AnimatedTouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -105,106 +110,107 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.md,
+    ...platformStyles.shadowSm,
   },
   title: {
-    ...typography.h2,
-    fontWeight: '700' as const,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
   },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   introCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    ...shadows.md,
+    gap: responsiveSize.sm,
+    marginBottom: responsiveSize.lg,
   },
   introIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: borderRadius.md,
     backgroundColor: rgbaFromHex(colors.primary.main, 0.15),
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.sm,
+    flexShrink: 0,
   },
   introContent: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
   },
   introTitle: {
-    ...typography.h3,
-    fontWeight: '600' as const,
+    fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   introText: {
-    ...typography.body1,
-    fontWeight: '400' as const,
     color: colors.text.secondary,
-    lineHeight: 24,
   },
+
   optionsGrid: {
-    gap: spacing.md,
+    gap: responsiveSize.md,
   },
   optionCard: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 88,
-    ...shadows.md,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
   optionContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.sm,
+    minWidth: 0,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.xl,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
-    ...shadows.sm,
+    marginRight: responsiveSize.sm,
+    flexShrink: 0,
   },
   textContainer: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 4,
   },
   optionTitle: {
-    ...typography.h4,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs / 2,
   },
   optionDescription: {
-    ...typography.body2,
-    fontWeight: '400',
     color: colors.text.secondary,
-    lineHeight: 20,
   },
   chevronContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
 });

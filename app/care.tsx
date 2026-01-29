@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -25,17 +24,22 @@ import Animated, {
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import BluebookWebView from '@/components/common/BluebookWebView';
+import { SmartText } from '@/components/common/SmartText';
 import { useCareServices, type CareService } from '@/hooks/useCareServices';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useUserData } from '@/hooks/useUserData';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function CareScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const { userData } = useUserData();
   const { services, loading, error, refetch } = useCareServices();
   const [selectedService, setSelectedService] = useState<CareService | null>(null);
+  const [webViewError, setWebViewError] = useState(false);
 
   if (selectedService) {
     const isBluebook = selectedService.serviceKey === 'bluebook';
@@ -47,19 +51,45 @@ export default function CareScreen() {
         exiting={SlideOutLeft}
       >
         <View style={styles.header}>
-          <BackButton onPress={() => setSelectedService(null)} />
+          <BackButton onPress={() => {
+            setSelectedService(null);
+            setWebViewError(false);
+          }} />
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{selectedService.title}</Text>
+            <SmartText variant="h3" style={styles.headerTitle}>{selectedService.title}</SmartText>
           </View>
         </View>
 
-        {isBluebook ? (
-          <BluebookWebView
-            url={selectedService.url}
-            email={userData?.email}
-          />
+        {webViewError ? (
+          <View style={styles.errorContainer}>
+            <AlertCircle size={moderateScale(48)} color={colors.status.error} />
+            <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Service</SmartText>
+            <SmartText variant="body2" style={styles.errorText}>
+              This service is temporarily unavailable. Please try again later or contact support.
+            </SmartText>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => setWebViewError(false)}
+            >
+              <RefreshCw size={moderateScale(20)} color={colors.background.default} />
+              <SmartText variant="body1" style={styles.retryButtonText}>Try Again</SmartText>
+            </TouchableOpacity>
+          </View>
         ) : (
-          <WebViewContainer url={selectedService.url} />
+          <React.Fragment>
+            {isBluebook ? (
+              Platform.OS === 'android' ? (
+                <WebViewContainer url={selectedService.url} />
+              ) : (
+                <BluebookWebView
+                  url={selectedService.url}
+                  email={userData?.email}
+                />
+              )
+            ) : (
+              <WebViewContainer url={selectedService.url} />
+            )}
+          </React.Fragment>
         )}
       </Animated.View>
     );
@@ -70,11 +100,11 @@ export default function CareScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>Care Services</Text>
+          <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
         </Animated.View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <Text style={styles.loadingText}>Loading services...</Text>
+          <SmartText variant="body1" style={styles.loadingText}>Loading services...</SmartText>
         </View>
       </View>
     );
@@ -85,15 +115,15 @@ export default function CareScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>Care Services</Text>
+          <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
         </Animated.View>
         <View style={styles.errorContainer}>
-          <AlertCircle size={48} color={colors.status.error} />
-          <Text style={styles.errorTitle}>Unable to Load Services</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <AlertCircle size={moderateScale(48)} color={colors.status.error} />
+          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Services</SmartText>
+          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
           <TouchableOpacity style={styles.retryButton} onPress={refetch}>
-            <RefreshCw size={20} color={colors.background.default} />
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <RefreshCw size={moderateScale(20)} color={colors.background.default} />
+            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -105,10 +135,10 @@ export default function CareScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>Care Services</Text>
+          <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
         </Animated.View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No services available at this time</Text>
+          <SmartText variant="body1" style={styles.emptyText}>No services available at this time</SmartText>
         </View>
       </View>
     );
@@ -118,149 +148,191 @@ export default function CareScreen() {
     <View style={styles.container}>
       <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Care Services</Text>
+        <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
       </Animated.View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.Text style={styles.description} entering={FadeInUp.delay(200)}>
-          Access telehealth, mental health, healthcare resources, and wellness tools all
-          in one convenient location.
-        </Animated.Text>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <SmartText variant="body1" style={styles.description}>
+              Access telehealth, mental health, healthcare resources, and wellness tools all
+              in one convenient location.
+            </SmartText>
+          </Animated.View>
 
-        {services.map((service, index) => {
-          const ServiceIcon = service.icon;
-          return (
-            <AnimatedTouchableOpacity
-              key={service.id}
-              style={styles.serviceCard}
-              onPress={() => setSelectedService(service)}
-              activeOpacity={0.9}
-              entering={FadeInUp.delay(300 + index * 100)}
-              layout={Layout.springify()}
-              accessibilityLabel={`Open ${service.title}`}
-              accessibilityRole="button"
-            >
-              <View style={styles.serviceContent}>
-                <View
-                  style={[styles.iconContainer, { backgroundColor: service.gradient }]}
+          <View style={styles.servicesGrid}>
+            {services.map((service, index) => {
+              const ServiceIcon = service.icon;
+              return (
+                <AnimatedTouchableOpacity
+                  key={service.id}
+                  style={styles.serviceCard}
+                  onPress={() => setSelectedService(service)}
+                  activeOpacity={0.9}
+                  entering={FadeInUp.delay(300 + index * 100)}
+                  layout={Layout.springify()}
+                  accessibilityLabel={`Open ${service.title}`}
+                  accessibilityRole="button"
                 >
-                  <ServiceIcon size={24} color={service.color} />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.serviceTitle} numberOfLines={1} ellipsizeMode="tail">
-                    {service.title}
-                  </Text>
-                  <Text style={styles.serviceDescription}>{service.description}</Text>
-                </View>
-              </View>
-              <ExternalLink size={20} color={service.color} />
-            </AnimatedTouchableOpacity>
-          );
-        })}
+                  <View style={styles.serviceContent}>
+                    <View
+                      style={[styles.iconContainer, { backgroundColor: service.gradient }]}
+                    >
+                      <ServiceIcon size={moderateScale(26)} color={service.color} />
+                    </View>
+                    <View style={styles.textContainer}>
+                      <SmartText variant="body1" style={styles.serviceTitle}>
+                        {service.title}
+                      </SmartText>
+                      <SmartText variant="body2" style={styles.serviceDescription}>
+                        {service.description}
+                      </SmartText>
+                    </View>
+                  </View>
+                  <ExternalLink size={moderateScale(18)} color={service.color} />
+                </AnimatedTouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.paper },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.paper
+  },
 
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    ...platformStyles.shadowSm,
   },
-  headerContent: { flex: 1, marginLeft: spacing.sm },
-  headerTitle: { ...typography.h3, fontWeight: '600', color: colors.text.primary },
-  title: { ...typography.h2, fontWeight: '700', color: colors.text.primary, marginLeft: spacing.sm },
+  headerContent: {
+    flex: 1,
+    marginLeft: responsiveSize.xs,
+  },
+  headerTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  title: {
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginLeft: responsiveSize.xs,
+  },
 
-  content: { flex: 1, padding: spacing.lg },
+  content: {
+    flex: 1
+  },
+  scrollContent: {
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
+  },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
 
   description: {
-    ...typography.body1,
-    fontWeight: '400',
     color: colors.text.secondary,
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.lg,
+  },
+
+  servicesGrid: {
+    gap: responsiveSize.md,
   },
 
   serviceCard: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
   serviceContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: responsiveSize.sm,
+    minWidth: 0,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.sm,
+    flexShrink: 0,
   },
-  textContainer: { flex: 1, minWidth: 0 },
+  textContainer: {
+    flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
+  },
   serviceTitle: {
-    ...typography.h4,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
-  serviceDescription: { ...typography.body2, fontWeight: '400', color: colors.text.secondary },
+  serviceDescription: {
+    color: colors.text.secondary,
+  },
 
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   loadingText: {
-    ...typography.body1,
     color: colors.text.secondary,
-    marginTop: spacing.md,
   },
 
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   errorTitle: {
-    ...typography.h3,
     fontWeight: '600',
     color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
   },
   errorText: {
-    ...typography.body2,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing.lg,
   },
   retryButton: {
     backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: responsiveSize.lg,
+    paddingVertical: responsiveSize.sm,
     borderRadius: borderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    ...shadows.md,
+    gap: responsiveSize.xs,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadow,
   },
   retryButtonText: {
-    ...typography.body1,
     fontWeight: '600',
     color: colors.background.default,
   },
@@ -269,10 +341,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
   },
   emptyText: {
-    ...typography.body1,
     color: colors.text.secondary,
     textAlign: 'center',
   },

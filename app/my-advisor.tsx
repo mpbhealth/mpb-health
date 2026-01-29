@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Platform,
   TouchableOpacity,
   Linking,
   Image,
   ScrollView,
-  useWindowDimensions,
   Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -17,17 +15,19 @@ import { useRouter } from 'expo-router';
 import { Phone, Mail, User, Star, Copy } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/lib/supabase';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 import { logger } from '@/lib/logger';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 const logoImg = require('../assets/images/logo.png');
-
-const ANDROID = Platform.OS === 'android';
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -48,8 +48,7 @@ interface Advisor {
 export default function MyAdvisorScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 600;
+  const { isTablet } = useResponsive();
 
   const { userData, loading: userLoading } = useUserData();
   const [advisor, setAdvisor] = useState<Advisor | null>(null);
@@ -139,14 +138,14 @@ export default function MyAdvisorScreen() {
   if (showFeedbackForm && advisor) {
     return (
       <View style={styles.container}>
-        <Animated.View style={[styles.header, !ANDROID && shadows.sm]} entering={FadeInDown.delay(100)}>
+        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => setShowFeedbackForm(false)} />
-          <Text style={styles.screenTitle}>Rate Your Advisor</Text>
+          <SmartText variant="h2" style={styles.screenTitle} maxLines={1}>Rate Your Advisor</SmartText>
         </Animated.View>
 
         <View style={styles.advisorHeader}>
-          <Text style={styles.advisorHeaderLabel}>Your Advisor:</Text>
-          <Text style={styles.advisorHeaderName}>{advisorFullName}</Text>
+          <SmartText variant="body2" style={styles.advisorHeaderLabel} maxLines={1}>Your Advisor:</SmartText>
+          <SmartText variant="h3" style={styles.advisorHeaderName} maxLines={2}>{advisorFullName}</SmartText>
         </View>
 
         <View style={styles.webviewWrapper}>
@@ -158,14 +157,14 @@ export default function MyAdvisorScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.header, !ANDROID && shadows.sm]} entering={FadeInDown.delay(100)}>
+      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.screenTitle}>My Advisor</Text>
+        <SmartText variant="h2" style={styles.screenTitle} maxLines={1}>My Advisor</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + responsiveSize.xl }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={styles.logoContainer} entering={FadeInDown.delay(200)}>
@@ -173,98 +172,101 @@ export default function MyAdvisorScreen() {
         </Animated.View>
 
         {error ? (
-          <Animated.View style={styles.messageCard} entering={FadeInUp.delay(300)}>
-            <Text style={styles.messageText}>{error}</Text>
+          <Animated.View entering={FadeInUp.delay(300)}>
+            <Card padding="lg" variant="outlined" style={styles.messageCard}>
+              <SmartText variant="body1" style={styles.messageText} maxLines={3}>{error}</SmartText>
+            </Card>
           </Animated.View>
         ) : !advisor ? (
-          <Animated.View style={styles.messageCard} entering={FadeInUp.delay(300)}>
-            <Text style={styles.messageText}>No advisor assigned. Please contact Concierge.</Text>
+          <Animated.View entering={FadeInUp.delay(300)}>
+            <Card padding="lg" variant="outlined" style={styles.messageCard}>
+              <SmartText variant="body1" style={styles.messageText} maxLines={3}>No advisor assigned. Please contact Concierge.</SmartText>
+            </Card>
           </Animated.View>
         ) : (
-          <Animated.View
-            style={[styles.advisorCard, isWide && styles.advisorCardWide, !ANDROID && shadows.md]}
-            entering={FadeInUp.delay(300)}
-          >
-            <View style={[styles.avatar, !ANDROID && shadows.sm]}>
-              <User size={40} color={colors.primary.main} />
-            </View>
+          <Animated.View entering={FadeInUp.delay(300)}>
+          <Card padding="lg" variant="elevated" style={isTablet ? { ...styles.advisorCard, ...styles.advisorCardWide } : styles.advisorCard}>
+            <View style={styles.avatar}>
+                <User size={moderateScale(40)} color={colors.primary.main} />
+              </View>
 
-            <Text style={styles.name}>{advisorFullName}</Text>
-            <Text style={styles.role}>Healthcare Advisor</Text>
+              <SmartText variant="h3" style={styles.name} maxLines={2}>{advisorFullName}</SmartText>
+              <SmartText variant="body2" style={styles.role} maxLines={1}>Healthcare Advisor</SmartText>
 
-            <View style={[styles.contactSection, isWide && styles.contactSectionWide]}>
-              <AnimatedTouchable
-                entering={FadeInUp.delay(400)}
-                style={[styles.actionButton, !ANDROID && shadows.sm]}
-                onPress={handleCall}
-                activeOpacity={0.7}
-              >
-                <View style={styles.iconBox}>
-                  <Phone size={24} color={colors.primary.main} />
-                </View>
-                <View style={styles.textBox}>
-                  <Text style={styles.contactLabel}>Call Advisor</Text>
-                  <View style={styles.contactRow}>
-                    <Text style={styles.contactValue} numberOfLines={1}>
-                      {advisor.phone}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => copyToClipboard(advisor.phone, 'Phone number')}
-                      style={styles.copyBtn}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Copy size={16} color={colors.text.secondary} />
-                    </TouchableOpacity>
+              <View style={[styles.contactSection, isTablet && styles.contactSectionWide]}>
+                <AnimatedTouchable
+                  entering={FadeInUp.delay(400)}
+                  style={styles.actionButton}
+                  onPress={handleCall}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.iconBox}>
+                    <Phone size={moderateScale(24)} color={colors.primary.main} />
                   </View>
-                </View>
-              </AnimatedTouchable>
-
-              <AnimatedTouchable
-                entering={FadeInUp.delay(500)}
-                style={[styles.actionButton, !ANDROID && shadows.sm]}
-                onPress={handleEmail}
-                activeOpacity={0.7}
-              >
-                <View style={styles.iconBox}>
-                  <Mail size={24} color={colors.primary.main} />
-                </View>
-                <View style={styles.textBox}>
-                  <Text style={styles.contactLabel}>Email Advisor</Text>
-                  <View style={styles.contactRow}>
-                    <Text style={styles.contactValue} numberOfLines={1}>
-                      {advisor.email}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => copyToClipboard(advisor.email, 'Email address')}
-                      style={styles.copyBtn}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Copy size={16} color={colors.text.secondary} />
-                    </TouchableOpacity>
+                  <View style={styles.textBox}>
+                    <SmartText variant="caption" style={styles.contactLabel} maxLines={1}>Call Advisor</SmartText>
+                    <View style={styles.contactRow}>
+                      <SmartText variant="body1" style={styles.contactValue} maxLines={1}>
+                        {advisor.phone}
+                      </SmartText>
+                      <TouchableOpacity
+                        onPress={() => copyToClipboard(advisor.phone, 'Phone number')}
+                        style={styles.copyBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Copy size={moderateScale(16)} color={colors.text.secondary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              </AnimatedTouchable>
-            </View>
+                </AnimatedTouchable>
 
-            <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>How They Help You</Text>
-              <Text style={styles.infoLine}>• Personalized membership guidance</Text>
-              <Text style={styles.infoLine}>• Education on medical cost sharing & membership features</Text>
-              <Text style={styles.infoLine}>• Support through enrollment</Text>
-              <Text style={styles.infoLine}>• Guidance if your healthcare needs change</Text>
-            </View>
+                <AnimatedTouchable
+                  entering={FadeInUp.delay(500)}
+                  style={styles.actionButton}
+                  onPress={handleEmail}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.iconBox}>
+                    <Mail size={moderateScale(24)} color={colors.primary.main} />
+                  </View>
+                  <View style={styles.textBox}>
+                    <SmartText variant="caption" style={styles.contactLabel} maxLines={1}>Email Advisor</SmartText>
+                    <View style={styles.contactRow}>
+                      <SmartText variant="body1" style={styles.contactValue} maxLines={1}>
+                        {advisor.email}
+                      </SmartText>
+                      <TouchableOpacity
+                        onPress={() => copyToClipboard(advisor.email, 'Email address')}
+                        style={styles.copyBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Copy size={moderateScale(16)} color={colors.text.secondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </AnimatedTouchable>
+              </View>
+
+              <View style={styles.infoBox}>
+                <SmartText variant="h4" style={styles.infoTitle} maxLines={2}>How They Help You</SmartText>
+                <SmartText variant="body2" style={styles.infoLine} maxLines={2}>• Personalized membership guidance</SmartText>
+                <SmartText variant="body2" style={styles.infoLine} maxLines={2}>• Education on medical cost sharing & membership features</SmartText>
+                <SmartText variant="body2" style={styles.infoLine} maxLines={2}>• Support through enrollment</SmartText>
+                <SmartText variant="body2" style={styles.infoLine} maxLines={2}>• Guidance if your healthcare needs change</SmartText>
+              </View>
+            </Card>
           </Animated.View>
         )}
 
         {advisor && (
           <Animated.View entering={FadeInUp.delay(600)}>
             <TouchableOpacity
-              style={[styles.rateButton, !ANDROID && shadows.md]}
+              style={styles.rateButton}
               onPress={() => setShowFeedbackForm(true)}
               activeOpacity={0.8}
             >
-              <Star size={20} color={colors.background.default} />
-              <Text style={styles.rateButtonText}>Rate Your Experience</Text>
+              <Star size={moderateScale(20)} color={colors.background.default} />
+              <SmartText variant="body1" style={styles.rateButtonText} maxLines={1}>Rate Your Experience</SmartText>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -281,55 +283,45 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingBottom: responsiveSize.md,
+    paddingHorizontal: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
+    ...platformStyles.shadowSm,
   },
   screenTitle: {
-    ...typography.h2,
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
     fontWeight: '700',
   },
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: responsiveSize.md,
   },
   logoContainer: {
     alignItems: 'center',
-    marginVertical: spacing.xl,
+    marginVertical: responsiveSize.xl,
   },
   logo: {
-    width: 160,
-    height: 45,
+    width: moderateScale(160),
+    height: moderateScale(45),
   },
   messageCard: {
-    backgroundColor: `${colors.status.error}10`,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-    alignItems: 'center',
+    backgroundColor: rgbaFromHex(colors.status.error, 0.06),
+    borderColor: rgbaFromHex(colors.status.error, 0.2),
+    marginBottom: responsiveSize.xl,
   },
   messageText: {
-    ...typography.body1,
     color: colors.status.error,
     textAlign: 'center',
   },
   advisorCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.lg,
     alignItems: 'center',
-    ...(ANDROID && {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: rgbaFromHex(colors.gray[400], 0.28),
-    }),
   },
   advisorCardWide: {
     maxWidth: 700,
@@ -337,57 +329,52 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: `${colors.primary.main}10`,
+    width: moderateScale(96),
+    height: moderateScale(96),
+    borderRadius: moderateScale(48),
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.1),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.lg,
+    ...platformStyles.shadowSm,
   },
   name: {
-    ...typography.h3,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    marginBottom: responsiveSize.xs,
     textAlign: 'center',
     fontWeight: '700',
   },
   role: {
-    ...typography.body2,
     color: colors.text.secondary,
-    marginBottom: spacing.xl,
+    marginBottom: responsiveSize.xl,
     textAlign: 'center',
   },
   contactSection: {
     width: '100%',
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.lg,
   },
   contactSectionWide: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: responsiveSize.md,
   },
   actionButton: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
-    minHeight: 80,
-    flex: 1,
-    ...(ANDROID && {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: rgbaFromHex(colors.gray[400], 0.28),
-    }),
+    marginBottom: responsiveSize.md,
+    minHeight: MIN_TOUCH_TARGET * 1.8,
+    ...platformStyles.shadowSm,
   },
   iconBox: {
-    width: 48,
-    height: 48,
+    width: moderateScale(48),
+    height: moderateScale(48),
     borderRadius: borderRadius.md,
-    backgroundColor: `${colors.primary.main}10`,
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.1),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.md,
     flexShrink: 0,
   },
   textBox: {
@@ -395,73 +382,67 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   contactLabel: {
-    ...typography.caption,
     color: colors.text.secondary,
-    marginBottom: spacing.xs / 2,
+    marginBottom: responsiveSize.xs / 2,
     fontWeight: '600',
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: responsiveSize.xs,
   },
   contactValue: {
-    ...typography.body1,
     color: colors.primary.main,
     fontWeight: '600',
-    flex: 1,
+    flexShrink: 1,
   },
   copyBtn: {
-    padding: spacing.xs,
+    padding: responsiveSize.xs,
     flexShrink: 0,
   },
   infoBox: {
-    backgroundColor: `${colors.primary.main}08`,
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.08),
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: responsiveSize.lg,
     width: '100%',
   },
   infoTitle: {
-    ...typography.h4,
     color: colors.primary.main,
-    marginBottom: spacing.md,
+    marginBottom: responsiveSize.md,
     fontWeight: '700',
   },
   infoLine: {
-    ...typography.body2,
     color: colors.text.primary,
-    lineHeight: 22,
-    marginBottom: spacing.xs,
+    marginBottom: responsiveSize.xs,
   },
   rateButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.secondary.main,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: responsiveSize.md,
+    paddingHorizontal: responsiveSize.lg,
     borderRadius: borderRadius.lg,
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.lg,
+    minHeight: MIN_TOUCH_TARGET,
+    gap: responsiveSize.xs,
+    ...platformStyles.shadow,
   },
   rateButtonText: {
-    ...typography.body1,
     color: colors.background.default,
     fontWeight: '600',
-    marginLeft: spacing.sm,
   },
   advisorHeader: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
   },
   advisorHeaderLabel: {
-    ...typography.body2,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    marginBottom: responsiveSize.xs,
   },
   advisorHeaderName: {
-    ...typography.h3,
     color: colors.text.primary,
     fontWeight: '700',
   },

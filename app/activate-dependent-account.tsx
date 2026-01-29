@@ -30,6 +30,11 @@ export default function ActivateDependentAccountScreen() {
     agentId,
     dob,
     primaryId,
+    activeDate,
+    inactiveDate,
+    inactiveReason,
+    isActive,
+    createdDate,
   } = useLocalSearchParams();
 
   const [email, setEmail] = useState('');
@@ -77,6 +82,20 @@ export default function ActivateDependentAccountScreen() {
         return;
       }
 
+      // Check if email matches primary member's email
+      if (primaryId) {
+        const { data: primaryUser } = await supabase
+          .from('users')
+          .select('email')
+          .eq('member_id', primaryId as string)
+          .maybeSingle();
+
+        if (primaryUser && primaryUser.email?.toLowerCase() === email.toLowerCase()) {
+          setError('Dependent cannot use the same email as the primary member. Please use a different email address.');
+          return;
+        }
+      }
+
       // Check if email is already in use
       const { data: existingUser } = await supabase
         .from('users')
@@ -115,7 +134,14 @@ export default function ActivateDependentAccountScreen() {
         dob: dob as string,
         relationship: relationship as string,
         is_primary: false,
-        primary_id: primaryId as string, // Set the primary user's UUID
+        primary_id: primaryId as string,
+        active_date: activeDate ? (activeDate as string) : null,
+        inactive_date: inactiveDate ? (inactiveDate as string) : null,
+        inactive_reason: inactiveReason ? (inactiveReason as string) : null,
+        is_active: isActive !== undefined && isActive !== null && String(isActive).trim() !== ''
+          ? String(isActive).toLowerCase() === 'true'
+          : null,
+        created_date: createdDate ? (createdDate as string) : null,
       });
 
       if (insertError) {
@@ -132,13 +158,13 @@ export default function ActivateDependentAccountScreen() {
 
       if (deleteError) {
         console.error('Failed to delete member record:', deleteError);
-        // Don't throw here as the account was successfully created
+        // Don't throw here as the login was successfully created
       }
 
       // Show success message
       Alert.alert(
-        'Account Activated!',
-        `${firstName} ${lastName}'s account has been successfully activated. They can now sign in using the email and password you provided.`,
+        'App Login Created!',
+        `${firstName} ${lastName}'s app login has been successfully created. They can now sign in to the app using the email and password you provided.`,
         [
           {
             text: 'OK',
@@ -147,7 +173,7 @@ export default function ActivateDependentAccountScreen() {
         ]
       );
     } catch (err) {
-      console.error('Error activating dependent account:', err);
+      console.error('Error creating app login for dependent:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -181,9 +207,9 @@ export default function ActivateDependentAccountScreen() {
               <Text style={styles.dependentRelationship}>{relationship}</Text>
             </View>
 
-            <Text style={styles.title}>Activate Dependent Account</Text>
+            <Text style={styles.title}>Create App Login</Text>
             <Text style={styles.subtitle}>
-              Set up email and password for this dependent to access their health portal.
+              Set up email and password for this dependent to access their health portal through the app. Their membership is already active.
             </Text>
 
             {error && (
@@ -275,14 +301,14 @@ export default function ActivateDependentAccountScreen() {
               disabled={isLoading}
             >
               <Text style={styles.activateButtonText}>
-                {isLoading ? 'Activating Account...' : 'Activate Account'}
+                {isLoading ? 'Creating Login...' : 'Create App Login'}
               </Text>
             </TouchableOpacity>
 
             <View style={styles.infoCard}>
               <AlertCircle size={20} color={colors.status.info} />
               <Text style={styles.infoText}>
-                Once activated, {firstName} will be able to sign in to their own account using the email and password you set here.
+                Once the login is created, {firstName} will be able to sign in to the app using the email and password you set here.
               </Text>
             </View>
           </Animated.View>

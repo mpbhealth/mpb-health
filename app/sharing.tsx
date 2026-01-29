@@ -1,14 +1,18 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { ExternalLink, AlertTriangle, Building2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
-import Animated, { 
-  FadeInDown, 
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
+import Animated, {
+  FadeInDown,
   FadeInUp,
   Layout,
   SlideInRight,
@@ -17,8 +21,18 @@ import Animated, {
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
+function rgbaFromHex(hex: string, alpha: number) {
+  const clean = hex.replace('#', '');
+  const int = parseInt(clean, 16);
+  const r = (int >> 16) & 0xff;
+  const g = (int >> 8) & 0xff;
+  const b = int & 0xff;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function SharingScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const { userData, loading } = useUserData();
   const [selectedProgram, setSelectedProgram] = useState<{
     title: string;
@@ -28,10 +42,10 @@ export default function SharingScreen() {
 
   // Product IDs that should see Zion Health
   const zionHealthProductIds = [
-    '29795', '29870', '30445', '30658', '30659', '31103', 
-    '32399', '35693', '35768', '35770', '40416', '42464', 
-    '42465', '42467', '42469', '42551', '42552', '42553', 
-    '45800', '46405', '45742', 'EMPLOYEE'
+    '29795', '29870', '30445', '30658', '30659', '31103',
+    '32399', '35693', '35768', '35770', '40416', '42464',
+    '42465', '42467', '42469', '42551', '42552', '42553',
+    '45800', '46405', '45742', '47182'
   ];
 
   // Product IDs that should see Sedera Health
@@ -39,7 +53,7 @@ export default function SharingScreen() {
 
   // Determine which programs to show based on product_id
   const availablePrograms = [];
-  
+
   if (userData?.product_id) {
     if (zionHealthProductIds.includes(userData.product_id)) {
       availablePrograms.push({
@@ -50,7 +64,7 @@ export default function SharingScreen() {
         gradient: `${colors.primary.main}15`,
       });
     }
-    
+
     if (sederaHealthProductIds.includes(userData.product_id)) {
       availablePrograms.push({
         title: 'Sedera Health',
@@ -68,7 +82,7 @@ export default function SharingScreen() {
 
   if (selectedProgram) {
     return (
-      <Animated.View 
+      <Animated.View
         style={styles.container}
         entering={SlideInRight}
         exiting={SlideOutLeft}
@@ -76,7 +90,7 @@ export default function SharingScreen() {
         <View style={styles.header}>
           <BackButton onPress={() => setSelectedProgram(null)} />
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{selectedProgram.title}</Text>
+            <SmartText variant="h3" style={styles.headerTitle}>{selectedProgram.title}</SmartText>
           </View>
         </View>
 
@@ -87,55 +101,64 @@ export default function SharingScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View 
+      <Animated.View
         style={styles.header}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Sharing</Text>
+        <SmartText variant="h2" style={styles.title}>Sharing</SmartText>
       </Animated.View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Animated.Text 
-          style={styles.description}
-          entering={FadeInUp.delay(200)}
-        >
-          Our sharing connect you with a community of health-conscious individuals who share in each other's medical expenses. Submit and manage your medical needs through your designated sharing program.
-        </Animated.Text>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <SmartText variant="body1" style={styles.description}>
+              Our sharing connect you with a community of health-conscious individuals who share in each other's medical expenses. Submit and manage your medical needs through your designated sharing program.
+            </SmartText>
+          </Animated.View>
 
-        {availablePrograms.map((program, index) => (
-          <AnimatedTouchableOpacity
-            key={program.title}
-            style={styles.programCard}
-            onPress={() => setSelectedProgram(program)}
-            entering={FadeInUp.delay(300 + index * 100)}
-            layout={Layout.springify()}
-          >
-            <View style={styles.programContent}>
-              <View style={[styles.iconContainer, { backgroundColor: program.gradient }]}>
-                <Building2 size={24} color={program.color} />
-              </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.programTitle}>{program.title}</Text>
-                <Text style={styles.programDescription}>{program.description}</Text>
-              </View>
-            </View>
-            <ExternalLink size={20} color={program.color} />
-          </AnimatedTouchableOpacity>
-        ))}
+          <View style={styles.programsGrid}>
+            {availablePrograms.map((program, index) => (
+              <AnimatedTouchableOpacity
+                key={program.title}
+                style={styles.programCard}
+                onPress={() => setSelectedProgram(program)}
+                entering={FadeInUp.delay(300 + index * 100)}
+                layout={Layout.springify()}
+              >
+                <View style={styles.programContent}>
+                  <View style={[styles.iconContainer, { backgroundColor: program.gradient }]}>
+                    <Building2 size={moderateScale(26)} color={program.color} />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <SmartText variant="body1" style={styles.programTitle}>
+                      {program.title}
+                    </SmartText>
+                    <SmartText variant="body2" style={styles.programDescription}>
+                      {program.description}
+                    </SmartText>
+                  </View>
+                </View>
+                <ExternalLink size={moderateScale(18)} color={program.color} />
+              </AnimatedTouchableOpacity>
+            ))}
+          </View>
 
-        <Animated.View 
-          style={styles.warningCard}
-          entering={FadeInUp.delay(400)}
-        >
-          <AlertTriangle size={24} color={colors.status.warning} />
-          <Text style={styles.warningText}>
-            Once you have met your initial unshareable amount, you may open a need through the sharing program included in your membership. If you are unsure which sharing program you are enrolled in, please contact our concierge for assistance.
-          </Text>
-        </Animated.View>
+          <Animated.View entering={FadeInUp.delay(400)}>
+            <Card padding="md" variant="outlined" style={styles.warningCard}>
+              <AlertTriangle size={moderateScale(22)} color={colors.status.warning} style={{ marginRight: responsiveSize.sm }} />
+              <View style={styles.warningContent}>
+                <SmartText variant="body2" style={styles.warningText}>
+                  Once you have met your initial unshareable amount, you may open a need through the sharing program included in your membership. If you are unsure which sharing program you are enrolled in, please contact our concierge for assistance.
+                </SmartText>
+              </View>
+            </Card>
+          </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -148,85 +171,100 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm
+    ...platformStyles.shadowSm,
   },
   headerContent: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   headerTitle: {
-    ...typography.h3,
+    fontWeight: '600',
     color: colors.text.primary,
   },
   title: {
-    ...typography.h2,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   content: {
     flex: 1,
-    padding: spacing.lg,
   },
+  scrollContent: {
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
+  },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   description: {
-    ...typography.body1,
     color: colors.text.secondary,
-    marginBottom: spacing.xl,
-    lineHeight: 24,
+    marginBottom: responsiveSize.lg,
   },
-  warningCard: {
-    backgroundColor: `${colors.status.warning}08`,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
+
+  programsGrid: {
+    gap: responsiveSize.md,
+    marginBottom: responsiveSize.lg,
   },
-  warningText: {
-    flex: 1,
-    ...typography.body2,
-    color: colors.status.warning,
-    lineHeight: 20,
-  },
+
   programCard: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.md,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
   programContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.sm,
+    minWidth: 0,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.sm,
+    flexShrink: 0,
   },
   textContainer: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
   },
   programTitle: {
-    ...typography.h4,
+    fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   programDescription: {
-    ...typography.body2,
     color: colors.text.secondary,
-    lineHeight: 20,
-  }
+  },
+
+  warningCard: {
+    backgroundColor: rgbaFromHex(colors.status.warning, 0.08),
+    borderColor: rgbaFromHex(colors.status.warning, 0.2),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  warningContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  warningText: {
+    color: colors.status.warning,
+  },
 });

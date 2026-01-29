@@ -1,16 +1,21 @@
-import { View, Text, StyleSheet, Platform, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Shield, Lock, Eye, FileText, ExternalLink, AlertCircle } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { useState } from 'react';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const [showFullPolicy, setShowFullPolicy] = useState(false);
 
   const sections = [
@@ -55,7 +60,7 @@ export default function PrivacyPolicyScreen() {
         <View style={styles.header}>
           <BackButton onPress={() => setShowFullPolicy(false)} />
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Privacy Policy</Text>
+            <SmartText variant="h3" style={styles.headerTitle}>Privacy Policy</SmartText>
           </View>
         </View>
         <WebViewContainer url="https://mpb.health/app-privacy-policy/" />
@@ -65,81 +70,83 @@ export default function PrivacyPolicyScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View 
+      <Animated.View
         style={styles.header}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Privacy & Terms</Text>
+        <SmartText variant="h2" style={styles.title}>Privacy & Terms</SmartText>
       </Animated.View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Animated.View 
-          style={styles.introCard}
-          entering={FadeInUp.delay(200)}
-        >
-          <Shield size={24} color={colors.primary.main} />
-          <View style={styles.introContent}>
-            <Text style={styles.lastUpdated}>Last Updated: March 20, 2024</Text>
-            <Text style={styles.introText}>
-              Your privacy is our top priority. We are committed to protecting your personal and health information through industry-leading security measures and transparent data practices.
-            </Text>
-          </View>
-        </Animated.View>
-
-        {sections.map((section, index) => (
-          <Animated.View
-            key={section.title}
-            style={styles.sectionCard}
-            entering={FadeInUp.delay(300 + index * 100)}
-          >
-            <View style={styles.sectionHeader}>
-              <View style={[styles.iconContainer, { backgroundColor: `${section.color}15` }]}>
-                <section.icon size={24} color={section.color} />
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <Card padding="lg" style={styles.introCard}>
+              <Shield size={moderateScale(22)} color={colors.primary.main} style={{ marginRight: responsiveSize.sm }} />
+              <View style={styles.introContent}>
+                <SmartText variant="caption" style={styles.lastUpdated}>Last Updated: March 20, 2024</SmartText>
+                <SmartText variant="body1" style={styles.introText}>
+                  Your privacy is our top priority. We are committed to protecting your personal and health information through industry-leading security measures and transparent data practices.
+                </SmartText>
               </View>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            </View>
-            <View style={styles.sectionContent}>
-              {section.items.map((item, itemIndex) => (
-                <View key={itemIndex} style={styles.bulletPoint}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={styles.bulletText}>{item}</Text>
-                </View>
-              ))}
-            </View>
+            </Card>
           </Animated.View>
-        ))}
 
-        <Animated.View 
-          style={styles.infoCard}
-          entering={FadeInUp.delay(600)}
-        >
-          <AlertCircle size={24} color={colors.status.info} />
-          <Text style={styles.infoText}>
-            For questions about your privacy or to exercise your data rights, please contact our Privacy Officer at info@mympb.com
-          </Text>
-        </Animated.View>
+          {sections.map((section, index) => (
+            <Animated.View
+              key={section.title}
+              entering={FadeInUp.delay(300 + index * 100)}
+            >
+              <Card padding="none" style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                  <View style={[styles.iconContainer, { backgroundColor: `${section.color}15` }]}>
+                    <section.icon size={moderateScale(22)} color={section.color} />
+                  </View>
+                  <SmartText variant="h3" style={styles.sectionTitle}>{section.title}</SmartText>
+                </View>
+                <View style={styles.sectionContent}>
+                  {section.items.map((item, itemIndex) => (
+                    <View key={itemIndex} style={styles.bulletPoint}>
+                      <SmartText variant="body1" style={styles.bullet}>•</SmartText>
+                      <SmartText variant="body1" style={styles.bulletText}>{item}</SmartText>
+                    </View>
+                  ))}
+                </View>
+              </Card>
+            </Animated.View>
+          ))}
 
-        <AnimatedTouchableOpacity
-          style={styles.viewFullButton}
-          onPress={() => setShowFullPolicy(true)}
-          entering={FadeInUp.delay(700)}
-        >
-          <View style={styles.viewFullContent}>
-            <ExternalLink size={20} color={colors.background.default} />
-            <Text style={styles.viewFullText}>View Full Privacy Policy</Text>
+          <Animated.View entering={FadeInUp.delay(600)}>
+            <Card padding="md" variant="outlined" style={styles.infoCard}>
+              <AlertCircle size={moderateScale(22)} color={colors.status.info} style={{ marginRight: responsiveSize.sm }} />
+              <SmartText variant="body1" style={styles.infoText}>
+                For questions about your privacy or to exercise your data rights, please contact our Privacy Officer at info@mympb.com
+              </SmartText>
+            </Card>
+          </Animated.View>
+
+          <AnimatedTouchableOpacity
+            style={styles.viewFullButton}
+            onPress={() => setShowFullPolicy(true)}
+            entering={FadeInUp.delay(700)}
+          >
+            <View style={styles.viewFullContent}>
+              <ExternalLink size={moderateScale(18)} color={colors.background.default} />
+              <SmartText variant="body1" style={styles.viewFullText}>View Full Privacy Policy</SmartText>
+            </View>
+          </AnimatedTouchableOpacity>
+
+          <View style={styles.footer}>
+            <SmartText variant="body2" style={styles.footerText}>
+              MPowering Benefits INC{'\n'}
+              5301 N Federal Hwy, Suite 155{'\n'}
+              Boca Raton, FL 33487
+            </SmartText>
           </View>
-        </AnimatedTouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            MPowering Benefits INC{'\n'}
-            5301 N Federal Hwy, Suite 155{'\n'}
-            Boca Raton, FL 33487
-          </Text>
         </View>
       </ScrollView>
     </View>
@@ -153,138 +160,137 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm
+    ...platformStyles.shadowSm,
   },
   headerContent: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   headerTitle: {
-    ...typography.h3,
+    fontWeight: '600',
     color: colors.text.primary,
   },
   title: {
-    ...typography.h2,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   content: {
     flex: 1,
-    padding: spacing.lg,
   },
+  scrollContent: {
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
+  },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   introCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    ...shadows.md,
+    marginBottom: responsiveSize.lg,
   },
   introContent: {
     flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs,
   },
   lastUpdated: {
-    ...typography.caption,
     color: colors.text.secondary,
-    marginBottom: spacing.sm,
   },
   introText: {
-    ...typography.body1,
     color: colors.text.primary,
-    lineHeight: 24,
   },
+
   sectionCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-    ...shadows.md,
+    marginBottom: responsiveSize.md,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    gap: spacing.md,
+    gap: responsiveSize.sm,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   sectionTitle: {
-    ...typography.h3,
+    fontWeight: '600',
     color: colors.text.primary,
   },
   sectionContent: {
-    padding: spacing.lg,
+    padding: responsiveSize.md,
+    gap: responsiveSize.xs,
   },
   bulletPoint: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: spacing.sm,
+    gap: responsiveSize.xs,
   },
   bullet: {
-    ...typography.body1,
     color: colors.text.secondary,
-    marginRight: spacing.sm,
-    marginTop: 2,
+    marginTop: moderateScale(1),
+    flexShrink: 0,
   },
   bulletText: {
     flex: 1,
-    ...typography.body1,
     color: colors.text.secondary,
-    lineHeight: 24,
   },
+
   infoCard: {
     backgroundColor: `${colors.status.info}08`,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    borderColor: `${colors.status.info}20`,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
+    marginBottom: responsiveSize.lg,
   },
   infoText: {
     flex: 1,
-    ...typography.body1,
     color: colors.status.info,
-    lineHeight: 24,
   },
+
   viewFullButton: {
     backgroundColor: colors.primary.main,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.xl,
-    ...shadows.md,
+    borderRadius: borderRadius.md,
+    marginBottom: responsiveSize.lg,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadow,
   },
   viewFullContent: {
-    padding: spacing.lg,
+    padding: responsiveSize.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: responsiveSize.xs,
+    minHeight: MIN_TOUCH_TARGET,
   },
   viewFullText: {
-    ...typography.body1,
     color: colors.background.default,
     fontWeight: '600',
   },
+
   footer: {
-    marginBottom: spacing.xxl,
+    marginBottom: responsiveSize.xl,
   },
   footerText: {
-    ...typography.body2,
     color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 24,
   },
 });

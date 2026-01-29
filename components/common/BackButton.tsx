@@ -6,7 +6,8 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { ArrowLeft } from 'lucide-react-native';
-import { colors, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 import { Pressable } from 'react-native';
 
 type Variant = 'filled' | 'ghost' | 'clear';
@@ -25,7 +26,7 @@ interface BackButtonProps {
 export function BackButton({
   onPress,
   color = colors.text.primary,
-  size = 22,
+  size = moderateScale(22),
   bgColor = '#f3f4f6',
   variant = 'filled',
   disabled = false,
@@ -44,7 +45,7 @@ export function BackButton({
       !isClear && { backgroundColor: bgColor },
       isGhost && styles.ghostBorder,
       disabled && { opacity: 0.5 },
-      Platform.OS === 'ios' && styles.iosShadow,
+      Platform.OS === 'ios' && platformStyles.shadowSm,
     ];
   }, [bgColor, variant, disabled]);
 
@@ -105,7 +106,7 @@ export function BackButton({
         accessibilityRole="button"
         accessibilityLabel="Go back"
         accessibilityHint="Navigates to the previous screen"
-        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        hitSlop={{ top: responsiveSize.xs, bottom: responsiveSize.xs, left: responsiveSize.xs, right: responsiveSize.xs }}
         disabled={disabled}
       >
         <View style={styles.iconRow}>
@@ -116,7 +117,7 @@ export function BackButton({
   );
 }
 
-const SIZE = 40;
+const SIZE = moderateScale(40);
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -141,16 +142,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
   },
-  iosShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-  },
   iconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    // avoid RN gap compatibility issues across platforms
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: responsiveSize.xs,
   },
 });

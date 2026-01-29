@@ -1,17 +1,23 @@
-import { View, Text, StyleSheet, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BackButton } from '@/components/common/BackButton';
-import { Heart, Phone, Ambulance, Calendar, AlertCircle as AlertCircle } from 'lucide-react-native';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
+import { Heart, Phone, Ambulance, Calendar, AlertCircle } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function WhatToDoScreen() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
 
   const sections = [
     {
       title: 'Large Medical Need',
       icon: Heart,
-      color: '#0891b2',
+      color: colors.primary.main,
       items: [
         'Doctor Choice: No network restrictions; choose your own doctor',
         'Cost: Pay only up to your Initial Unshared Amount (IUA)',
@@ -22,7 +28,7 @@ export default function WhatToDoScreen() {
     {
       title: 'Small Medical Need',
       icon: Phone,
-      color: '#059669',
+      color: colors.status.success,
       subtitle: 'Telehealth Access to:',
       items: [
         'Primary Care Physicians',
@@ -34,7 +40,7 @@ export default function WhatToDoScreen() {
     {
       title: 'Urgent & Emergency Care',
       icon: Ambulance,
-      color: '#7c3aed',
+      color: colors.secondary.main,
       subsections: [
         {
           subtitle: 'Urgent Care:',
@@ -56,7 +62,7 @@ export default function WhatToDoScreen() {
     {
       title: 'Annual Wellness',
       icon: Calendar,
-      color: '#f59e0b',
+      color: colors.status.warning,
       subsections: [
         {
           subtitle: 'HSA Plans:',
@@ -83,78 +89,81 @@ export default function WhatToDoScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View 
+      <Animated.View
         style={styles.header}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>What to do?</Text>
+        <SmartText variant="h2" style={styles.title}>What to do?</SmartText>
       </Animated.View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Animated.View 
-          style={styles.introCard}
-          entering={FadeInUp.delay(200)}
-        >
-          <AlertCircle size={24} color="#0891b2" />
-          <Text style={styles.introText}>
-            This guide helps you understand what to do in different medical situations. Always contact our Concierge team if you need assistance or have questions.
-          </Text>
-        </Animated.View>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <Card padding="md" variant="outlined" style={styles.introCard}>
+              <AlertCircle size={moderateScale(22)} color={colors.primary.main} style={{ marginRight: responsiveSize.sm }} />
+              <SmartText variant="body1" style={styles.introText}>
+                This guide helps you understand what to do in different medical situations. Always contact our Concierge team if you need assistance or have questions.
+              </SmartText>
+            </Card>
+          </Animated.View>
 
-        {sections.map((section, index) => (
-          <Animated.View
-            key={section.title}
-            style={styles.sectionCard}
-            entering={FadeInUp.delay(300 + index * 100)}
-          >
-            <View style={styles.sectionHeader}>
-              <View style={[styles.iconContainer, { backgroundColor: `${section.color}15` }]}>
-                <section.icon size={24} color={section.color} />
-              </View>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            </View>
+          {sections.map((section, index) => (
+            <Animated.View
+              key={section.title}
+              entering={FadeInUp.delay(300 + index * 100)}
+            >
+              <Card padding="none" style={styles.sectionCard}>
+                <View style={styles.sectionHeader}>
+                  <View style={[styles.iconContainer, { backgroundColor: `${section.color}15` }]}>
+                    <section.icon size={moderateScale(22)} color={section.color} />
+                  </View>
+                  <SmartText variant="h3" style={styles.sectionTitle}>{section.title}</SmartText>
+                </View>
 
-            <View style={styles.sectionContent}>
-              {section.subtitle && (
-                <Text style={styles.subtitle}>{section.subtitle}</Text>
-              )}
+                <View style={styles.sectionContent}>
+                  {section.subtitle && (
+                    <SmartText variant="body1" style={styles.subtitle}>{section.subtitle}</SmartText>
+                  )}
 
-              {section.items && (
-                <View style={styles.itemsList}>
-                  {section.items.map((item, itemIndex) => (
-                    <View key={itemIndex} style={styles.item}>
-                      <Text style={styles.bullet}>•</Text>
-                      <Text style={styles.itemText}>{item}</Text>
+                  {section.items && (
+                    <View style={styles.itemsList}>
+                      {section.items.map((item, itemIndex) => (
+                        <View key={itemIndex} style={styles.item}>
+                          <SmartText variant="body1" style={styles.bullet}>•</SmartText>
+                          <SmartText variant="body1" style={styles.itemText}>{item}</SmartText>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {section.subsections && section.subsections.map((subsection, subIndex) => (
+                    <View key={subIndex} style={styles.subsection}>
+                      <SmartText variant="body1" style={styles.subtitle}>{subsection.subtitle}</SmartText>
+                      <View style={styles.itemsList}>
+                        {subsection.items.map((item, itemIndex) => (
+                          <View key={itemIndex} style={styles.item}>
+                            <SmartText variant="body1" style={styles.bullet}>•</SmartText>
+                            <SmartText variant="body1" style={styles.itemText}>{item}</SmartText>
+                          </View>
+                        ))}
+                      </View>
                     </View>
                   ))}
                 </View>
-              )}
+              </Card>
+            </Animated.View>
+          ))}
 
-              {section.subsections && section.subsections.map((subsection, subIndex) => (
-                <View key={subIndex} style={styles.subsection}>
-                  <Text style={styles.subtitle}>{subsection.subtitle}</Text>
-                  <View style={styles.itemsList}>
-                    {subsection.items.map((item, itemIndex) => (
-                      <View key={itemIndex} style={styles.item}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.itemText}>{item}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </View>
-          </Animated.View>
-        ))}
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            For any questions or assistance, contact our Concierge team.
-          </Text>
+          <View style={styles.footer}>
+            <SmartText variant="body2" style={styles.footerText}>
+              For any questions or assistance, contact our Concierge team.
+            </SmartText>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -164,115 +173,107 @@ export default function WhatToDoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background.paper,
   },
   header: {
-    backgroundColor: '#ffffff',
-    padding: 20,
+    backgroundColor: colors.background.default,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 3,
+    ...platformStyles.shadowSm,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginLeft: 12,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginLeft: responsiveSize.xs,
   },
   content: {
     flex: 1,
-    padding: 20,
   },
+  scrollContent: {
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
+  },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   introCard: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: colors.primary.main + '08',
+    borderColor: colors.primary.main + '20',
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    marginBottom: responsiveSize.lg,
   },
   introText: {
     flex: 1,
-    fontSize: 15,
-    color: '#0c4a6e',
-    lineHeight: 24,
+    color: colors.primary.dark,
   },
+
   sectionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 3,
+    marginBottom: responsiveSize.md,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: responsiveSize.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-    gap: 12,
+    borderBottomColor: colors.gray[100],
+    gap: responsiveSize.sm,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   sectionTitle: {
-    fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text.primary,
   },
   sectionContent: {
-    padding: 20,
+    padding: responsiveSize.md,
+    gap: responsiveSize.sm,
   },
   subtitle: {
-    fontSize: 16,
     fontWeight: '500',
-    color: '#4b5563',
-    marginBottom: 12,
+    color: colors.text.secondary,
   },
   itemsList: {
-    gap: 8,
+    gap: responsiveSize.xs,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: responsiveSize.xs,
   },
   bullet: {
-    fontSize: 16,
-    color: '#6b7280',
-    lineHeight: 24,
+    color: colors.text.secondary,
+    marginTop: moderateScale(1),
+    flexShrink: 0,
   },
   itemText: {
     flex: 1,
-    fontSize: 15,
-    color: '#4b5563',
-    lineHeight: 24,
+    color: colors.text.secondary,
   },
   subsection: {
-    marginTop: 16,
+    gap: responsiveSize.xs,
   },
   footer: {
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: responsiveSize.xs,
+    marginBottom: responsiveSize.lg,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     textAlign: 'center',
   },
 });

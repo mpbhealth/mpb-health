@@ -1,23 +1,19 @@
-// src/screens/NotificationsScreen.tsx
-
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Platform,
   ScrollView,
   Pressable,
-  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, AlertCircle, ChevronRight } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const ANDROID = Platform.OS === 'android';
+import { SmartText } from '@/components/common/SmartText';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface Notification {
   id: string;
@@ -31,9 +27,7 @@ interface Notification {
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
+  const { isTablet } = useResponsive();
 
   const [notifications, setNotifications] = useState<Notification[]>([
     {
@@ -84,141 +78,175 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={[
-          styles.header,
-          { paddingTop: Platform.OS === 'ios' ? insets.top + spacing.sm : spacing.lg },
-          !ANDROID && shadows.sm, // iOS soft shadow only
-        ]}
+        style={styles.header}
       >
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Notifications</Text>
+        <SmartText variant="h2" style={styles.title}>Notifications</SmartText>
       </Animated.View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, isTablet && styles.tabletScrollContent]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {notifications.length === 0 ? (
-          <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
-            <Bell size={64} color={colors.gray[300]} />
-            <Text style={styles.emptyTitle}>No Notifications</Text>
-            <Text style={styles.emptyText}>You don't have any notifications at the moment.</Text>
-          </Animated.View>
-        ) : (
-          <View style={[styles.list, isTablet && styles.tabletList]}>
-            {notifications.map((n, i) => {
-              const accent = getColor(n.type);
-              const bgColor = accent + '15';
-              return (
-                <Animated.View
-                  key={n.id}
-                  entering={FadeInUp.delay(200 + i * 100)}
-                  style={[styles.cardWrapper, isTablet && (i % 2 === 0 ? { marginRight: spacing.md } : {})]}
-                >
-                  <Pressable
-                    onPress={() => onPress(n)}
-                    style={[
-                      styles.card,
-                      ANDROID && styles.cardSurface, // remove Android shadow halo
-                      !ANDROID && shadows.sm,        // keep iOS shadow
-                      !n.read && { backgroundColor: colors.primary.main + '08' },
-                    ]}
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          {notifications.length === 0 ? (
+            <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
+              <Bell size={moderateScale(56)} color={colors.gray[300]} />
+              <SmartText variant="h3" style={styles.emptyTitle}>No Notifications</SmartText>
+              <SmartText variant="body1" style={styles.emptyText}>You don't have any notifications at the moment.</SmartText>
+            </Animated.View>
+          ) : (
+            <View style={styles.list}>
+              {notifications.map((n, i) => {
+                const accent = getColor(n.type);
+                const bgColor = accent + '15';
+                return (
+                  <Animated.View
+                    key={n.id}
+                    entering={FadeInUp.delay(200 + i * 100)}
+                    style={styles.cardWrapper}
                   >
-                    <View style={[styles.icon, { backgroundColor: bgColor }]}>
-                      <AlertCircle size={24} color={accent} />
-                    </View>
-
-                    <View style={styles.textBlock}>
-                      <View style={styles.line}>
-                        <Text style={styles.cardTitle}>{n.title}</Text>
-                        {!n.read && <View style={[styles.dot, { backgroundColor: accent }]} />}
+                    <Pressable
+                      onPress={() => onPress(n)}
+                      style={[
+                        styles.card,
+                        !n.read && { backgroundColor: colors.primary.main + '08' },
+                      ]}
+                    >
+                      <View style={[styles.icon, { backgroundColor: bgColor }]}>
+                        <AlertCircle size={moderateScale(22)} color={accent} />
                       </View>
-                      <Text style={styles.cardMsg} numberOfLines={2}>
-                        {n.message}
-                      </Text>
-                      <Text style={styles.cardDate}>{formatDate(n.date)}</Text>
-                    </View>
 
-                    {n.route && <ChevronRight size={20} color={colors.gray[400]} />}
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
-          </View>
-        )}
+                      <View style={styles.textBlock}>
+                        <View style={styles.line}>
+                          <SmartText variant="body1" style={styles.cardTitle}>{n.title}</SmartText>
+                          {!n.read && <View style={[styles.dot, { backgroundColor: accent }]} />}
+                        </View>
+                        <SmartText variant="body2" style={styles.cardMsg}>
+                          {n.message}
+                        </SmartText>
+                        <SmartText variant="caption" style={styles.cardDate}>{formatDate(n.date)}</SmartText>
+                      </View>
+
+                      {n.route && <ChevronRight size={moderateScale(18)} color={colors.gray[400]} />}
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-// tiny util to mimic iOS elevation with a hairline border on Android
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.paper },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.paper,
+  },
 
   header: {
     backgroundColor: colors.background.default,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: Platform.OS === 'android' ? StyleSheet.hairlineWidth : 0,
-    borderBottomColor: Platform.OS === 'android' ? colors.gray[100] : 'transparent',
+    padding: responsiveSize.md,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    ...platformStyles.shadowSm,
   },
 
   title: {
-    ...typography.h2,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
 
-  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xl },
-  tabletScrollContent: { maxWidth: 900, alignSelf: 'center' },
+  scrollContent: {
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl,
+  },
 
-  emptyState: { marginTop: spacing.xxl, alignItems: 'center', paddingHorizontal: spacing.lg },
-  emptyTitle: { ...typography.h3, marginTop: spacing.lg, color: colors.text.primary },
-  emptyText: { ...typography.body1, marginTop: spacing.xs, color: colors.text.secondary, textAlign: 'center' },
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
 
-  list: { flexDirection: 'column' },
-  tabletList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  emptyState: {
+    marginTop: responsiveSize.xl,
+    alignItems: 'center',
+    gap: responsiveSize.md,
+  },
+  emptyTitle: {
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  emptyText: {
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
 
-  cardWrapper: { marginBottom: spacing.md, width: '100%' },
+  list: {
+    gap: responsiveSize.md,
+  },
+
+  cardWrapper: {
+    width: '100%',
+  },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     borderRadius: borderRadius.lg,
-  },
-
-  // Android surface replacement for shadows
-  cardSurface: {
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.gray[100],
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
 
   icon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.lg,
+    marginRight: responsiveSize.sm,
+    flexShrink: 0,
   },
 
-  textBlock: { flex: 1 },
+  textBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 2,
+  },
 
-  line: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
+  line: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: responsiveSize.xs,
+  },
 
-  cardTitle: { ...typography.h4, color: colors.text.primary, flex: 1 },
+  cardTitle: {
+    color: colors.text.primary,
+    fontWeight: '600',
+    flex: 1,
+  },
 
-  dot: { width: 8, height: 8, borderRadius: borderRadius.full, marginLeft: spacing.sm },
+  dot: {
+    width: moderateScale(7),
+    height: moderateScale(7),
+    borderRadius: borderRadius.full,
+    flexShrink: 0,
+  },
 
-  cardMsg: { ...typography.body1, color: colors.text.secondary, lineHeight: 20, marginBottom: spacing.xs },
+  cardMsg: {
+    color: colors.text.secondary,
+  },
 
-  cardDate: { ...typography.caption, color: colors.text.secondary },
+  cardDate: {
+    color: colors.text.secondary,
+  },
 });

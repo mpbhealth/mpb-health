@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -30,8 +29,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { useLabsTesting, type LabsTestingService } from '@/hooks/useLabsTesting';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 import type WebView from 'react-native-webview';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -91,15 +94,19 @@ function AnimatedServiceCard({
     >
       <View style={styles.serviceContent}>
         <View style={[styles.iconContainer, { backgroundColor: service.gradient }]}>
-          <ServiceIcon size={28} color={service.color} />
+          <ServiceIcon size={moderateScale(24)} color={service.color} />
         </View>
         <View style={styles.textContainer}>
-          <Text style={styles.serviceTitle}>{service.title}</Text>
-          <Text style={styles.serviceDescription}>{service.description}</Text>
+          <SmartText variant="body1" style={styles.serviceTitle}>
+            {service.title}
+          </SmartText>
+          <SmartText variant="body2" style={styles.serviceDescription}>
+            {service.description}
+          </SmartText>
         </View>
       </View>
       <View style={[styles.chevronContainer, { backgroundColor: service.gradient }]}>
-        <ExternalLink size={20} color={service.color} />
+        <ExternalLink size={moderateScale(18)} color={service.color} />
       </View>
     </AnimatedTouchableOpacity>
   );
@@ -109,31 +116,41 @@ export default function LabsTestingScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { services, loading, error, refetch } = useLabsTesting();
+  const { isTablet } = useResponsive();
 
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
 
   const webRef = useRef<WebView>(null);
   const wvCanGoBackRef = useRef(false);
 
-  // unified back handler: try WebView -> close overlay -> allow pop
   const handleBackWithinWebView = useCallback(() => {
     if (selectedUrl) {
       if (wvCanGoBackRef.current && webRef.current) {
         webRef.current.goBack();
-        return true; // handled
+        return true;
       }
-      // close overlay
       setSelectedUrl(null);
-      return true; // handled
+      return true;
     }
-    return false; // not handled (screen can pop)
+    return false;
   }, [selectedUrl]);
 
-  // Intercept navigator pops (includes iOS swipe) while screen is focused
+  // Disable swipe gesture when WebView is open
+  useEffect(() => {
+    if (selectedUrl) {
+      navigation.setOptions({
+        gestureEnabled: false,
+      });
+    } else {
+      navigation.setOptions({
+        gestureEnabled: true,
+      });
+    }
+  }, [selectedUrl, navigation]);
+
   useFocusEffect(
     useCallback(() => {
       const sub = navigation.addListener('beforeRemove', (e: any) => {
-        // If we can handle back internally, prevent the pop
         if (handleBackWithinWebView()) {
           e.preventDefault();
         }
@@ -142,14 +159,12 @@ export default function LabsTestingScreen() {
     }, [navigation, handleBackWithinWebView]),
   );
 
-  // Android hardware back: same logic
   useEffect(() => {
     const onBack = () => (handleBackWithinWebView() ? true : false);
     const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
     return () => sub.remove();
   }, [handleBackWithinWebView]);
 
-  // Selected webview UI
   if (selectedUrl) {
     return (
       <Animated.View style={styles.container} entering={SlideInRight} exiting={SlideOutLeft}>
@@ -160,7 +175,7 @@ export default function LabsTestingScreen() {
             }}
           />
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>RX & Diagnostics</Text>
+            <SmartText variant="h3" style={styles.headerTitle}>RX & Diagnostics</SmartText>
           </View>
         </View>
 
@@ -168,7 +183,6 @@ export default function LabsTestingScreen() {
           ref={webRef as any}
           url={selectedUrl}
           onNavigationStateChange={(navState) => {
-            // keep a ref to avoid stale closures in listeners
             wvCanGoBackRef.current = !!navState?.canGoBack;
           }}
         />
@@ -181,11 +195,11 @@ export default function LabsTestingScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>RX & Diagnostics</Text>
+          <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
         </Animated.View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <Text style={styles.loadingText}>Loading services...</Text>
+          <SmartText variant="body1" style={styles.loadingText}>Loading services...</SmartText>
         </View>
       </View>
     );
@@ -196,15 +210,15 @@ export default function LabsTestingScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>RX & Diagnostics</Text>
+          <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
         </Animated.View>
         <View style={styles.errorContainer}>
-          <AlertCircle size={48} color={colors.status.error} />
-          <Text style={styles.errorTitle}>Unable to Load Services</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <AlertCircle size={moderateScale(48)} color={colors.status.error} />
+          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Services</SmartText>
+          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
           <TouchableOpacity style={styles.retryButton} onPress={refetch}>
-            <RefreshCw size={20} color={colors.background.default} />
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <RefreshCw size={moderateScale(20)} color={colors.background.default} />
+            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -216,10 +230,10 @@ export default function LabsTestingScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>RX & Diagnostics</Text>
+          <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
         </Animated.View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No services available at this time</Text>
+          <SmartText variant="body1" style={styles.emptyText}>No services available at this time</SmartText>
         </View>
       </View>
     );
@@ -229,7 +243,7 @@ export default function LabsTestingScreen() {
     <View style={styles.container}>
       <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>RX & Diagnostics</Text>
+        <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
       </Animated.View>
 
       <ScrollView
@@ -237,134 +251,204 @@ export default function LabsTestingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Animated.Text style={styles.description} entering={FadeInUp.delay(200)}>
-          Access affordable laboratory testing and imaging services through our trusted partners.
-          Compare prices, find convenient locations, and schedule your appointments with ease.
-        </Animated.Text>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <SmartText variant="body1" style={styles.description}>
+              Access affordable laboratory testing and imaging services through our trusted partners.
+              Compare prices, find convenient locations, and schedule your appointments with ease.
+            </SmartText>
+          </Animated.View>
 
-        <View style={styles.servicesGrid}>
-          {services.map((service, index) => (
-            <AnimatedServiceCard
-              key={service.id}
-              service={service}
-              index={index}
-              onPress={() => setSelectedUrl(service.url)}
-            />
-          ))}
-        </View>
-
-        <Animated.View style={styles.warningCard} entering={FadeInUp.delay(700)}>
-          <View style={styles.warningHeader}>
-            <AlertTriangle size={24} color={colors.status.warning} />
-            <Text style={styles.warningTitle}>Important Notice</Text>
+          <View style={styles.servicesGrid}>
+            {services.map((service, index) => (
+              <AnimatedServiceCard
+                key={service.id}
+                service={service}
+                index={index}
+                onPress={() => setSelectedUrl(service.url)}
+              />
+            ))}
           </View>
-          <Text style={styles.warningText}>
-            Please be advised that due to the Eliminating Kickbacks in Recovery Act (EKRA),
-            certain laboratory costs exceeding your Initial Unshareable Amount (IUA) may not
-            be eligible for reimbursement through healthsharing plans.
-          </Text>
-        </Animated.View>
+
+          <Animated.View entering={FadeInUp.delay(700)}>
+            <Card padding="md" variant="outlined" style={styles.warningCard}>
+              <View style={styles.warningHeader}>
+                <AlertTriangle size={moderateScale(22)} color={colors.status.warning} />
+                <SmartText variant="h4" style={styles.warningTitle}>Important Notice</SmartText>
+              </View>
+              <SmartText variant="body2" style={styles.warningText}>
+                Please be advised that due to the Eliminating Kickbacks in Recovery Act (EKRA),
+                certain laboratory costs exceeding your Initial Unshareable Amount (IUA) may not
+                be eligible for reimbursement through healthsharing plans.
+              </SmartText>
+            </Card>
+          </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.paper },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.paper
+  },
 
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.md,
+    ...platformStyles.shadowSm,
   },
-  headerContent: { flex: 1, marginLeft: spacing.sm },
-  headerTitle: { ...typography.h3, fontWeight: '600', color: colors.text.primary },
-  title: { ...typography.h2, fontWeight: '700', color: colors.text.primary, marginLeft: spacing.sm },
+  headerContent: {
+    flex: 1,
+    marginLeft: responsiveSize.xs,
+  },
+  headerTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  title: {
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginLeft: responsiveSize.xs,
+  },
 
-  content: { flex: 1 },
-  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  content: {
+    flex: 1
+  },
+  scrollContent: {
+    padding: responsiveSize.md,
+    paddingBottom: responsiveSize.xl
+  },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   description: {
-    ...typography.body1,
-    fontWeight: '400',
     color: colors.text.secondary,
-    marginBottom: spacing.xl,
-    lineHeight: 24,
+    marginBottom: responsiveSize.lg,
   },
 
-  servicesGrid: { gap: spacing.md, marginBottom: spacing.xl },
+  servicesGrid: {
+    gap: responsiveSize.md,
+    marginBottom: responsiveSize.lg
+  },
 
   serviceCard: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 80,
-    ...shadows.md,
-    shadowColor: colors.primary.main,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
-  serviceContent: { flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm },
+  serviceContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: responsiveSize.sm,
+    minWidth: 0,
+  },
 
   iconContainer: {
-    width: 40, height: 40, borderRadius: borderRadius.md, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: responsiveSize.sm,
+    flexShrink: 0,
   },
-  textContainer: { flex: 1 },
-  serviceTitle: { ...typography.h4, fontWeight: '600', color: colors.text.primary, marginBottom: spacing.xs / 2 },
-  serviceDescription: { ...typography.body2, fontWeight: '400', color: colors.text.secondary, lineHeight: 20 },
+  textContainer: {
+    flex: 1,
+    minWidth: 0,
+    gap: responsiveSize.xs / 4,
+  },
+  serviceTitle: {
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  serviceDescription: {
+    color: colors.text.secondary,
+  },
 
-  chevronContainer: { width: 36, height: 36, borderRadius: borderRadius.lg, justifyContent: 'center', alignItems: 'center' },
+  chevronContainer: {
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
 
-  warningCard: { backgroundColor: rgbaFromHex(colors.status.warning, 0.08), borderRadius: borderRadius.xl, padding: spacing.md, marginBottom: spacing.xxl },
-  warningHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, columnGap: spacing.sm as unknown as number },
-  warningTitle: { ...typography.h4, fontWeight: '600', color: colors.status.warning },
-  warningText: { ...typography.body2, fontWeight: '400', color: colors.status.warning, lineHeight: 20 },
+  warningCard: {
+    backgroundColor: rgbaFromHex(colors.status.warning, 0.08),
+    borderColor: rgbaFromHex(colors.status.warning, 0.2),
+    marginBottom: responsiveSize.lg,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: responsiveSize.sm,
+    gap: responsiveSize.sm,
+  },
+  warningTitle: {
+    fontWeight: '600',
+    color: colors.status.warning,
+    flex: 1,
+  },
+  warningText: {
+    color: colors.status.warning,
+  },
 
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   loadingText: {
-    ...typography.body1,
     color: colors.text.secondary,
-    marginTop: spacing.md,
   },
 
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   errorTitle: {
-    ...typography.h3,
     fontWeight: '600',
     color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
   },
   errorText: {
-    ...typography.body2,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing.lg,
   },
   retryButton: {
     backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: responsiveSize.lg,
+    paddingVertical: responsiveSize.sm,
     borderRadius: borderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    ...shadows.md,
+    gap: responsiveSize.xs,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadow,
   },
   retryButtonText: {
-    ...typography.body1,
     fontWeight: '600',
     color: colors.background.default,
   },
@@ -373,10 +457,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
   },
   emptyText: {
-    ...typography.body1,
     color: colors.text.secondary,
     textAlign: 'center',
   },

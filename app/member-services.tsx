@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
   Platform,
-  useWindowDimensions,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import {
   ExternalLink,
   AlertCircle,
@@ -25,27 +25,60 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
+import { SmartText } from '@/components/common/SmartText';
+import { Card } from '@/components/common/Card';
 import { useUserData } from '@/hooks/useUserData';
 import { useMemberForms, type MemberForm } from '@/hooks/useMemberForms';
-import {
-  colors,
-  shadows,
-  typography,
-  spacing,
-  borderRadius,
-} from '@/constants/theme';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
+function rgbaFromHex(hex: string, alpha: number) {
+  const clean = hex.replace('#', '');
+  const int = parseInt(clean, 16);
+  const r = (int >> 16) & 0xff;
+  const g = (int >> 8) & 0xff;
+  const b = int & 0xff;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function MemberServicesScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 640;
+  const { isTablet } = useResponsive();
   const { userData } = useUserData();
   const { forms, loading, error, refetch } = useMemberForms();
 
   const [selectedService, setSelectedService] = useState<MemberForm | null>(null);
+
+  // Disable swipe gesture when WebView is open
+  useEffect(() => {
+    if (selectedService) {
+      navigation.setOptions({
+        gestureEnabled: false,
+      });
+    } else {
+      navigation.setOptions({
+        gestureEnabled: true,
+      });
+    }
+  }, [selectedService, navigation]);
+
+  // Handle hardware back button on Android
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selectedService) {
+        setSelectedService(null);
+        return true;
+      }
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [selectedService]);
 
   if (selectedService) {
     const isSchedReq = selectedService.url.includes('RequestToScheduleAnAppointment');
@@ -59,7 +92,7 @@ export default function MemberServicesScreen() {
         <View style={styles.header}>
           <BackButton onPress={() => setSelectedService(null)} />
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Member Forms</Text>
+            <SmartText variant="h3" style={styles.headerTitle}>Member Forms</SmartText>
           </View>
         </View>
 
@@ -172,11 +205,11 @@ export default function MemberServicesScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>Member Forms</Text>
+          <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
         </Animated.View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <Text style={styles.loadingText}>Loading forms...</Text>
+          <SmartText variant="body1" style={styles.loadingText}>Loading forms...</SmartText>
         </View>
       </View>
     );
@@ -187,15 +220,15 @@ export default function MemberServicesScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>Member Forms</Text>
+          <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
         </Animated.View>
         <View style={styles.errorContainer}>
-          <AlertCircle size={48} color={colors.status.error} />
-          <Text style={styles.errorTitle}>Unable to Load Forms</Text>
-          <Text style={styles.errorText}>{error}</Text>
+          <AlertCircle size={moderateScale(48)} color={colors.status.error} />
+          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Forms</SmartText>
+          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
           <TouchableOpacity style={styles.retryButton} onPress={refetch}>
-            <RefreshCw size={20} color={colors.background.default} />
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <RefreshCw size={moderateScale(20)} color={colors.background.default} />
+            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -207,10 +240,10 @@ export default function MemberServicesScreen() {
       <View style={styles.container}>
         <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <Text style={styles.title}>Member Forms</Text>
+          <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
         </Animated.View>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No forms available at this time</Text>
+          <SmartText variant="body1" style={styles.emptyText}>No forms available at this time</SmartText>
         </View>
       </View>
     );
@@ -220,66 +253,73 @@ export default function MemberServicesScreen() {
     <View style={styles.container}>
       <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <Text style={styles.title}>Member Forms</Text>
+        <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + responsiveSize.xl }]}
       >
-        <Animated.Text style={styles.description} entering={FadeInUp.delay(200)}>
-          Manage your membership and access self-service options
-        </Animated.Text>
+        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+          <Animated.View entering={FadeInUp.delay(200)}>
+            <SmartText variant="body1" style={styles.description}>
+              Manage your membership and access self-service options
+            </SmartText>
+          </Animated.View>
 
-        <View style={isWide ? styles.gridContainer : undefined}>
-          {forms.map((form, index) => {
-            const FormIcon = form.icon;
-            return (
-              <AnimatedTouchableOpacity
-                key={form.id}
-                style={[styles.serviceCard, isWide && styles.serviceCardWide]}
-                onPress={() => setSelectedService(form)}
-                entering={FadeInUp.delay(300 + index * 100)}
-                layout={Layout.springify()}
-                activeOpacity={0.9}
-              >
-                <View style={styles.serviceContent}>
-                  <View style={[styles.iconContainer, { backgroundColor: form.gradient }]}>
-                    <FormIcon size={24} color={form.color} />
-                  </View>
-                  <View style={styles.textContainer}>
-                    <View style={styles.titleRow}>
-                      <Text style={styles.serviceTitle} numberOfLines={1}>
-                        {form.title}
-                      </Text>
-                      {form.badge && (
-                        <View style={[styles.badge, { backgroundColor: form.gradient }]}>
-                          <Text style={[styles.badgeText, { color: form.color }]}>
-                            {form.badge}
-                          </Text>
-                        </View>
-                      )}
+          <View style={isTablet ? styles.gridContainer : undefined}>
+            {forms.map((form, index) => {
+              const FormIcon = form.icon;
+              return (
+                <AnimatedTouchableOpacity
+                  key={form.id}
+                  style={[styles.serviceCard, isTablet && styles.serviceCardWide]}
+                  onPress={() => setSelectedService(form)}
+                  entering={FadeInUp.delay(300 + index * 100)}
+                  layout={Layout.springify()}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.serviceContent}>
+                    <View style={[styles.iconContainer, { backgroundColor: form.gradient }]}>
+                      <FormIcon size={moderateScale(24)} color={form.color} />
                     </View>
-                    <Text style={styles.serviceDescription}>{form.description}</Text>
+                    <View style={styles.textContainer}>
+                      <View style={styles.titleRow}>
+                        <SmartText variant="body1" style={styles.serviceTitle}>
+                          {form.title}
+                        </SmartText>
+                        {form.badge && (
+                          <View style={[styles.badge, { backgroundColor: form.gradient }]}>
+                            <SmartText variant="caption" style={[styles.badgeText, { color: form.color }]}>
+                              {form.badge}
+                            </SmartText>
+                          </View>
+                        )}
+                      </View>
+                      <SmartText variant="body2" style={styles.serviceDescription}>
+                        {form.description}
+                      </SmartText>
+                    </View>
                   </View>
-                </View>
-                <ExternalLink size={20} color={form.color} />
-              </AnimatedTouchableOpacity>
-            );
-          })}
-        </View>
-
-        <Animated.View
-          style={styles.supportCard}
-          entering={FadeInUp.delay(400 + forms.length * 100)}
-        >
-          <AlertCircle size={24} color={colors.status.info} style={{ marginRight: spacing.sm }} />
-          <View style={styles.supportContent}>
-            <Text style={styles.supportTitle}>Support Hours</Text>
-            <Text style={styles.supportText}>Mon – Fri, 9:00 AM – 8:00 PM EST</Text>
+                  <ExternalLink size={moderateScale(18)} color={form.color} />
+                </AnimatedTouchableOpacity>
+              );
+            })}
           </View>
-        </Animated.View>
+
+          <Animated.View
+            entering={FadeInUp.delay(400 + forms.length * 100)}
+          >
+            <Card padding="md" variant="outlined" style={styles.supportCard}>
+              <AlertCircle size={moderateScale(22)} color={colors.status.info} style={{ marginRight: responsiveSize.sm }} />
+              <View style={styles.supportContent}>
+                <SmartText variant="body1" style={styles.supportTitle}>Support Hours</SmartText>
+                <SmartText variant="body2" style={styles.supportText}>Mon – Fri, 9:00 AM – 5:00 PM EST</SmartText>
+              </View>
+            </Card>
+          </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -293,40 +333,44 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    padding: responsiveSize.md,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    ...platformStyles.shadowSm,
   },
   headerContent: {
     flex: 1,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
   headerTitle: {
-    fontSize: typography.h3.fontSize,
-    lineHeight: typography.h3.lineHeight,
     fontWeight: '600',
     color: colors.text.primary,
   },
   title: {
-    fontSize: typography.h2.fontSize,
-    lineHeight: typography.h2.lineHeight,
     fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
+    marginLeft: responsiveSize.xs,
   },
 
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
   },
+  scrollContent: {
+    padding: responsiveSize.md,
+  },
+
+  maxWidthContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabletMaxWidth: {
+    maxWidth: 900,
+  },
+
   description: {
-    fontSize: typography.body1.fontSize,
-    lineHeight: typography.body1.lineHeight,
     color: colors.text.secondary,
-    marginBottom: spacing.lg,
+    marginBottom: responsiveSize.lg,
   },
 
   gridContainer: {
@@ -338,92 +382,80 @@ const styles = StyleSheet.create({
   serviceCard: {
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: responsiveSize.md,
+    marginBottom: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 80,
-    ...shadows.sm,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadowSm,
   },
   serviceCardWide: {
     width: '48%',
-    marginBottom: spacing.md,
   },
   serviceContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: responsiveSize.sm,
     minWidth: 0,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
+    width: moderateScale(36),
+    height: moderateScale(36),
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: responsiveSize.sm,
     flexShrink: 0,
   },
   textContainer: {
     flex: 1,
     minWidth: 0,
+    gap: responsiveSize.xs / 4,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs / 2,
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: responsiveSize.xs / 2,
   },
   serviceTitle: {
-    fontSize: typography.h4.fontSize,
-    lineHeight: typography.h4.lineHeight,
     fontWeight: '600',
     color: colors.text.primary,
-    flexShrink: 1,
+    flex: 1,
   },
   serviceDescription: {
-    fontSize: typography.body2.fontSize,
-    lineHeight: 20,
     color: colors.text.secondary,
   },
 
   badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
+    paddingHorizontal: responsiveSize.sm,
+    paddingVertical: responsiveSize.xs / 2,
     borderRadius: borderRadius.full,
   },
   badgeText: {
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
     fontWeight: '600',
   },
 
   supportCard: {
-    backgroundColor: `${colors.status.info}08`,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    backgroundColor: rgbaFromHex(colors.status.info, 0.08),
+    borderColor: rgbaFromHex(colors.status.info, 0.2),
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: responsiveSize.md,
+    marginBottom: responsiveSize.lg,
   },
   supportContent: {
     flex: 1,
     minWidth: 0,
+    gap: responsiveSize.xs / 4,
   },
   supportTitle: {
-    fontSize: typography.body1.fontSize,
-    lineHeight: typography.body1.lineHeight,
     fontWeight: '600',
     color: colors.status.info,
-    marginBottom: spacing.xs / 2,
   },
   supportText: {
-    fontSize: typography.body2.fontSize,
-    lineHeight: typography.body2.lineHeight,
     color: colors.status.info,
   },
 
@@ -431,45 +463,40 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   loadingText: {
-    ...typography.body1,
     color: colors.text.secondary,
-    marginTop: spacing.md,
   },
 
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
+    gap: responsiveSize.md,
   },
   errorTitle: {
-    ...typography.h3,
     fontWeight: '600',
     color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
   },
   errorText: {
-    ...typography.body2,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing.lg,
   },
   retryButton: {
     backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: responsiveSize.lg,
+    paddingVertical: responsiveSize.sm,
     borderRadius: borderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    ...shadows.md,
+    gap: responsiveSize.xs,
+    minHeight: MIN_TOUCH_TARGET,
+    ...platformStyles.shadow,
   },
   retryButtonText: {
-    ...typography.body1,
     fontWeight: '600',
     color: colors.background.default,
   },
@@ -478,10 +505,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: responsiveSize.xl,
   },
   emptyText: {
-    ...typography.body1,
     color: colors.text.secondary,
     textAlign: 'center',
   },
