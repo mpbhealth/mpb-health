@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   AlertCircle,
   RefreshCw,
+  FlaskConical,
 } from 'lucide-react-native';
 import Animated, {
   FadeInDown,
@@ -31,9 +32,11 @@ import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
+import { EmptyState } from '@/components/common/EmptyState';
 import { useLabsTesting, type LabsTestingService } from '@/hooks/useLabsTesting';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 import type WebView from 'react-native-webview';
 
@@ -115,8 +118,10 @@ function AnimatedServiceCard({
 export default function LabsTestingScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { services, loading, error, refetch } = useLabsTesting();
   const { isTablet } = useResponsive();
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
 
@@ -168,7 +173,7 @@ export default function LabsTestingScreen() {
   if (selectedUrl) {
     return (
       <Animated.View style={styles.container} entering={SlideInRight} exiting={SlideOutLeft}>
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton
             onPress={() => {
               if (!handleBackWithinWebView()) router.back();
@@ -193,7 +198,7 @@ export default function LabsTestingScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
         </Animated.View>
@@ -208,7 +213,7 @@ export default function LabsTestingScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
         </Animated.View>
@@ -228,28 +233,32 @@ export default function LabsTestingScreen() {
   if (services.length === 0) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
         </Animated.View>
-        <View style={styles.emptyContainer}>
-          <SmartText variant="body1" style={styles.emptyText}>No services available at this time</SmartText>
-        </View>
+        <EmptyState
+          icon={<FlaskConical size={moderateScale(48)} color={colors.gray[300]} />}
+          message="No services available at this time"
+          actionLabel="Contact Concierge"
+          onAction={() => router.push('/chatWithConcierge' as never)}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -298,14 +307,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '600',
@@ -451,16 +460,5 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontWeight: '600',
     color: colors.background.default,
-  },
-
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-  },
-  emptyText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
   },
 });

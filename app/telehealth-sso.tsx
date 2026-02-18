@@ -18,6 +18,7 @@ import { TelehealthWebView, TelehealthWebViewRef } from '@/components/telehealth
 import { useUserData } from '@/hooks/useUserData';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
 
 const MAX_RETRY_ATTEMPTS = 3;
@@ -26,8 +27,10 @@ const RETRY_DELAYS = [1000, 2000, 4000];
 export default function TelehealthSSOScreen() {
   const router = useRouter();
   const { redirectId } = useLocalSearchParams<{ redirectId?: string }>();
+  const { headerPaddingTop } = useSafeHeaderPadding();
   const { userData, loading: userLoading } = useUserData();
   const { session } = useAuth();
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -349,7 +352,7 @@ export default function TelehealthSSOScreen() {
   if (showFuturePlanModal && planStartDate) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <View style={styles.headerContent}>
             <Stethoscope size={24} color={colors.primary.main} />
@@ -395,7 +398,7 @@ export default function TelehealthSSOScreen() {
   if (ssoUrl) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={handleBackPress} />
           <View style={styles.headerContent}>
             <Stethoscope size={24} color={colors.primary.main} />
@@ -424,7 +427,7 @@ export default function TelehealthSSOScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
           <Stethoscope size={24} color={colors.primary.main} />
@@ -549,7 +552,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
     ...shadows.sm,
@@ -560,6 +562,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: spacing.sm,
     gap: spacing.sm,
+    minWidth: 0,
   },
   headerTitle: {
     ...typography.h3,

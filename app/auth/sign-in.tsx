@@ -24,6 +24,7 @@ import Animated, {
   Layout,
 } from 'react-native-reanimated';
 import { useAuth } from '@/hooks/useAuth';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { supabase } from '@/lib/supabase';
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
@@ -35,6 +36,7 @@ const logoImg = require('../../assets/images/logo.png');
 
 export default function SignInScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { signIn } = useAuth();
 
   const [emailRaw, setEmailRaw] = useState('');
@@ -268,7 +270,8 @@ export default function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -423,7 +426,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   content: { alignSelf: 'center', width: '100%', maxWidth: 400 },
 

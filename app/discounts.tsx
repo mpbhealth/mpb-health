@@ -14,14 +14,17 @@ import {
   ExternalLink,
   AlertCircle,
   RefreshCw,
+  Percent,
 } from 'lucide-react-native';
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
+import { EmptyState } from '@/components/common/EmptyState';
 import { useDiscountServices, type DiscountService } from '@/hooks/useDiscountServices';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 import Animated, {
   FadeInDown,
@@ -134,9 +137,11 @@ function AnimatedServiceCard({
 export default function DiscountsScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
   const { services, loading, error, refetch } = useDiscountServices();
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   // Disable swipe gesture when WebView is open
   useEffect(() => {
@@ -167,7 +172,7 @@ export default function DiscountsScreen() {
   if (selectedUrl) {
     return (
       <Animated.View style={styles.container} entering={SlideInRight} exiting={SlideOutLeft}>
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton onPress={() => setSelectedUrl(null)} />
           <View style={styles.headerContent}>
             <SmartText variant="h3" style={styles.headerTitle}>Discounts</SmartText>
@@ -181,7 +186,7 @@ export default function DiscountsScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
         </Animated.View>
@@ -196,7 +201,7 @@ export default function DiscountsScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
         </Animated.View>
@@ -216,28 +221,32 @@ export default function DiscountsScreen() {
   if (services.length === 0) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
         </Animated.View>
-        <View style={styles.emptyContainer}>
-          <SmartText variant="body1" style={styles.emptyText}>No discounts available at this time</SmartText>
-        </View>
+        <EmptyState
+          icon={<Percent size={moderateScale(48)} color={colors.gray[300]} />}
+          message="No discounts available at this time"
+          actionLabel="Contact Concierge"
+          onAction={() => router.push('/chatWithConcierge' as never)}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -300,14 +309,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '600',
@@ -509,14 +518,4 @@ const styles = StyleSheet.create({
     color: colors.background.default,
   },
 
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-  },
-  emptyText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
 });

@@ -8,11 +8,13 @@ import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, platformStyles, moderateScale } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { supabase } from '@/lib/supabase';
 import { AlertCircle, RefreshCw } from 'lucide-react-native';
 
 export default function RxCardScreen() {
   const router = useRouter();
+  const { headerPaddingTop } = useSafeHeaderPadding();
   const { userData, loading } = useUserData();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -107,7 +109,7 @@ export default function RxCardScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
           <SmartText variant="h3" style={styles.headerTitle}>RX Discount Card</SmartText>
@@ -194,12 +196,11 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,

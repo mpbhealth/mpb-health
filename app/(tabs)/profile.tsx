@@ -17,19 +17,19 @@ import {
   Lock,
   LogOut,
   ChevronRight,
-  Users,
+  CreditCard,
 } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp, FadeIn, Layout } from 'react-native-reanimated';
 import { signOutUser } from '@/lib/auth';
 import { useUserData } from '@/hooks/useUserData';
 import { colors, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
+import { PaymentDisclaimerModal } from '@/components/modals/PaymentDisclaimerModal';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -50,7 +50,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { userData, loading } = useUserData();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showPaymentDisclaimerModal, setShowPaymentDisclaimerModal] = useState(false);
   const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
 
   const initials = useMemo(
@@ -79,10 +81,10 @@ export default function ProfileScreen() {
       title: 'Membership',
       items: [
         { title: 'Plan Details', description: 'View your health plan information', icon: Shield, route: '/plan-details', color: colors.primary.dark },
-        { title: 'My Advisor', description: 'Contact your dedicated health advisor', icon: UserCog, route: '/my-advisor', color: colors.secondary.dark },
         ...(userData?.is_primary
-          ? [{ title: 'Create App Login', description: 'Set up app login for your dependents', icon: Users, route: '/activate-dependents', color: colors.primary.main }]
+          ? [{ title: 'Payment', description: 'Update payment information, view receipts and personal information', icon: CreditCard, route: '/payment-history', color: colors.primary.main }]
           : []),
+        { title: 'My Advisor', description: 'Contact your dedicated health advisor', icon: UserCog, route: '/my-advisor', color: colors.secondary.dark },
         { title: 'What to do?', description: 'Learn what to do in different medical situations', icon: FileText, route: '/what-to-do', color: colors.secondary.dark },
       ],
     },
@@ -96,7 +98,7 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <Animated.View
         entering={FadeInDown.delay(80)}
-        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? insets.top + 8 : responsiveSize.lg }]}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
       >
         <SmartText variant="h2" style={styles.title}>My Profile</SmartText>
       </Animated.View>
@@ -104,7 +106,8 @@ export default function ProfileScreen() {
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + responsiveSize.xl }]}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInDown.delay(160)}>
@@ -146,32 +149,41 @@ export default function ProfileScreen() {
 
               <Card padding="none" variant="elevated" style={styles.cardList}>
                 {sec.items.map((item, idx) => (
-                  <AnimatedTouchableOpacity
+                  <Animated.View
                     key={item.title}
-                    style={[styles.menuItem, idx !== sec.items.length - 1 && styles.menuItemDivider]}
-                    onPress={() => router.push(item.route as never)}
-                    disabled={loading}
                     entering={FadeInUp.delay(260 + idx * 50)}
                     layout={Layout.springify()}
-                    activeOpacity={0.85}
                   >
-                    <View style={styles.menuLeft}>
-                      <View style={[styles.iconContainer, { backgroundColor: rgbaFromHex(item.color, 0.12) }]}>
-                        <item.icon size={moderateScale(20)} color={item.color} />
+                    <TouchableOpacity
+                      style={[styles.menuItem, idx !== sec.items.length - 1 && styles.menuItemDivider]}
+                      onPress={() => {
+                        if (item.route === '/payment-history') {
+                          setShowPaymentDisclaimerModal(true);
+                        } else {
+                          router.push(item.route as never);
+                        }
+                      }}
+                      disabled={loading}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.menuLeft}>
+                        <View style={[styles.iconContainer, { backgroundColor: rgbaFromHex(item.color, 0.12) }]}>
+                          <item.icon size={moderateScale(20)} color={item.color} />
+                        </View>
+
+                        <View style={styles.menuTextWrap}>
+                          <SmartText variant="body1" style={styles.menuTitle}>
+                            {item.title}
+                          </SmartText>
+                          <SmartText variant="body2" style={styles.menuDesc}>
+                            {item.description}
+                          </SmartText>
+                        </View>
                       </View>
 
-                      <View style={styles.menuTextWrap}>
-                        <SmartText variant="body1" style={styles.menuTitle}>
-                          {item.title}
-                        </SmartText>
-                        <SmartText variant="body2" style={styles.menuDesc}>
-                          {item.description}
-                        </SmartText>
-                      </View>
-                    </View>
-
-                    <ChevronRight size={moderateScale(18)} color={colors.gray[400]} />
-                  </AnimatedTouchableOpacity>
+                      <ChevronRight size={moderateScale(18)} color={colors.gray[400]} />
+                    </TouchableOpacity>
+                  </Animated.View>
                 ))}
               </Card>
             </Animated.View>
@@ -197,7 +209,7 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setShowLogoutConfirm(false)}
       >
-        <Animated.View style={styles.modalOverlay} entering={FadeIn}>
+        <Animated.View entering={FadeIn} style={[styles.modalOverlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <Card padding="lg" variant="elevated" style={styles.modalCard}>
             <SmartText variant="h3" style={styles.modalTitle}>Log Out</SmartText>
             <SmartText variant="body1" style={styles.modalMessage}>Are you sure you want to log out?</SmartText>
@@ -212,6 +224,16 @@ export default function ProfileScreen() {
           </Card>
         </Animated.View>
       </Modal>
+
+      <PaymentDisclaimerModal
+        visible={showPaymentDisclaimerModal}
+        onClose={() => setShowPaymentDisclaimerModal(false)}
+        onContinue={() => {
+          setShowPaymentDisclaimerModal(false);
+          router.push('/payment-history' as never);
+        }}
+        onContactConcierge={() => router.push('/chatWithConcierge' as never)}
+      />
     </View>
   );
 }
@@ -228,7 +250,7 @@ const styles = StyleSheet.create({
     paddingBottom: responsiveSize.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
     color: colors.text.primary,

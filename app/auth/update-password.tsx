@@ -18,11 +18,13 @@ import { Eye, EyeOff, AlertCircle, Check } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const logoImg = require('../../assets/images/logo.png');
 
 export default function UpdatePasswordScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -133,7 +135,8 @@ export default function UpdatePasswordScreen() {
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -281,7 +284,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   content: {
     flex: 1,

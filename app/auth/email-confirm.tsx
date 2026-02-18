@@ -3,12 +3,12 @@ import { View, Text, StyleSheet, ActivityIndicator, Platform, Alert } from 'reac
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { colors, typography, spacing } from '@/constants/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 export default function EmailConfirmScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { headerPaddingTop } = useSafeHeaderPadding();
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
@@ -79,7 +79,7 @@ export default function EmailConfirmScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === 'ios' ? insets.top : spacing.xl }]}>
+    <View style={[styles.container, { paddingTop: headerPaddingTop }]}>
       <View style={styles.content}>
         <ActivityIndicator size="large" color={colors.primary.main} />
         <Text style={styles.messageTitle}>Confirming your email...</Text>

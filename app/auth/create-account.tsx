@@ -22,6 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const formatDateForStorage = (dobString: string): string => {
   if (!dobString) return '';
@@ -81,6 +82,7 @@ export default function CreateAccountScreen() {
     isActive,
     createdDate,
   } = useLocalSearchParams();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -233,7 +235,7 @@ export default function CreateAccountScreen() {
         throw new Error('Failed to create user profile. Please try again.');
       }
 
-      // Delete original member row only AFTER successful insert
+      // Data must exist only in users table: remove from members after successful insert
       const { error: deleteError } = await supabase
         .from('members')
         .delete()
@@ -261,7 +263,8 @@ export default function CreateAccountScreen() {
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -352,7 +355,7 @@ export default function CreateAccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background.default },
-  scrollContent: { flexGrow: 1, padding: spacing.lg, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+  scrollContent: { flexGrow: 1, padding: spacing.lg },
   content: { flex: 1, width: '100%', maxWidth: 400, alignSelf: 'center' },
   header: { marginBottom: spacing.xxl },
   backButton: {

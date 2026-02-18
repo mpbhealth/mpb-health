@@ -9,6 +9,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Constants from 'expo-constants';
 import { useAuth } from '@/hooks/useAuth';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAYS = [1000, 2000, 4000];
@@ -16,6 +17,7 @@ const RETRY_DELAYS = [1000, 2000, 4000];
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -205,7 +207,8 @@ export default function ForgotPasswordScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -307,7 +310,7 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background.default },
-  scrollContent: { flexGrow: 1, padding: spacing.lg, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+  scrollContent: { flexGrow: 1, padding: spacing.lg },
   content: { flex: 1, width: '100%', maxWidth: 400, alignSelf: 'center' },
 
   header: { marginBottom: spacing.xxl },

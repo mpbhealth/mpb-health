@@ -14,8 +14,10 @@ import {
   ExternalLink,
   AlertCircle,
   RefreshCw,
+  FileText,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -27,13 +29,12 @@ import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
+import { EmptyState } from '@/components/common/EmptyState';
 import { useUserData } from '@/hooks/useUserData';
 import { useMemberForms, type MemberForm } from '@/hooks/useMemberForms';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -48,7 +49,9 @@ export default function MemberServicesScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
   const { userData } = useUserData();
   const { forms, loading, error, refetch } = useMemberForms();
 
@@ -89,7 +92,7 @@ export default function MemberServicesScreen() {
         entering={SlideInRight}
         exiting={SlideOutLeft}
       >
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton onPress={() => setSelectedService(null)} />
           <View style={styles.headerContent}>
             <SmartText variant="h3" style={styles.headerTitle}>Member Forms</SmartText>
@@ -99,6 +102,7 @@ export default function MemberServicesScreen() {
         <View style={{ flex: 1, paddingBottom: insets.bottom }}>
           <WebViewContainer
             url={selectedService.url}
+            highSecurity
             {...(isSchedReq && {
               injectedJavaScript: `
                 (function() {
@@ -203,7 +207,7 @@ export default function MemberServicesScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
         </Animated.View>
@@ -218,7 +222,7 @@ export default function MemberServicesScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
         </Animated.View>
@@ -238,28 +242,32 @@ export default function MemberServicesScreen() {
   if (forms.length === 0) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
         </Animated.View>
-        <View style={styles.emptyContainer}>
-          <SmartText variant="body1" style={styles.emptyText}>No forms available at this time</SmartText>
-        </View>
+        <EmptyState
+          icon={<FileText size={moderateScale(48)} color={colors.gray[300]} />}
+          message="No forms available at this time"
+          actionLabel="Contact Concierge"
+          onAction={() => router.push('/chatWithConcierge' as never)}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + responsiveSize.xl }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -272,38 +280,41 @@ export default function MemberServicesScreen() {
             {forms.map((form, index) => {
               const FormIcon = form.icon;
               return (
-                <AnimatedTouchableOpacity
+                <Animated.View
                   key={form.id}
-                  style={[styles.serviceCard, isTablet && styles.serviceCardWide]}
-                  onPress={() => setSelectedService(form)}
                   entering={FadeInUp.delay(300 + index * 100)}
                   layout={Layout.springify()}
-                  activeOpacity={0.9}
                 >
-                  <View style={styles.serviceContent}>
-                    <View style={[styles.iconContainer, { backgroundColor: form.gradient }]}>
-                      <FormIcon size={moderateScale(24)} color={form.color} />
-                    </View>
-                    <View style={styles.textContainer}>
-                      <View style={styles.titleRow}>
-                        <SmartText variant="body1" style={styles.serviceTitle}>
-                          {form.title}
-                        </SmartText>
-                        {form.badge && (
-                          <View style={[styles.badge, { backgroundColor: form.gradient }]}>
-                            <SmartText variant="caption" style={[styles.badgeText, { color: form.color }]}>
-                              {form.badge}
-                            </SmartText>
-                          </View>
-                        )}
+                  <TouchableOpacity
+                    style={[styles.serviceCard, isTablet && styles.serviceCardWide]}
+                    onPress={() => setSelectedService(form)}
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.serviceContent}>
+                      <View style={[styles.iconContainer, { backgroundColor: form.gradient }]}>
+                        <FormIcon size={moderateScale(24)} color={form.color} />
                       </View>
-                      <SmartText variant="body2" style={styles.serviceDescription}>
-                        {form.description}
-                      </SmartText>
+                      <View style={styles.textContainer}>
+                        <View style={styles.titleRow}>
+                          <SmartText variant="body1" style={styles.serviceTitle}>
+                            {form.title}
+                          </SmartText>
+                          {form.badge && (
+                            <View style={[styles.badge, { backgroundColor: form.gradient }]}>
+                              <SmartText variant="caption" style={[styles.badgeText, { color: form.color }]}>
+                                {form.badge}
+                              </SmartText>
+                            </View>
+                          )}
+                        </View>
+                        <SmartText variant="body2" style={styles.serviceDescription}>
+                          {form.description}
+                        </SmartText>
+                      </View>
                     </View>
-                  </View>
-                  <ExternalLink size={moderateScale(18)} color={form.color} />
-                </AnimatedTouchableOpacity>
+                    <ExternalLink size={moderateScale(18)} color={form.color} />
+                  </TouchableOpacity>
+                </Animated.View>
               );
             })}
           </View>
@@ -334,14 +345,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '600',
@@ -499,16 +510,5 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontWeight: '600',
     color: colors.background.default,
-  },
-
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-  },
-  emptyText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
   },
 });

@@ -178,8 +178,13 @@ export default function HomeScreen() {
   const [showTelehealthDisclaimer, setShowTelehealthDisclaimer] = useState(false);
   const [showPendingActivationModal, setShowPendingActivationModal] = useState(false);
   const insets = useSafeAreaInsets();
-  const dimensions = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const { isTablet, isExtraSmall } = useResponsive();
+
+  const contentPaddingHorizontal = useMemo(
+    () => (screenWidth <= 320 ? moderateScale(12) : moderateScale(16)),
+    [screenWidth]
+  );
 
   useEffect(() => {
     const dimensionHandler = Dimensions.addEventListener('change', () => {
@@ -238,7 +243,7 @@ export default function HomeScreen() {
     }
   }, [pendingActivation, loading]);
 
-  const healthWalletProductIds = new Set(['44036', '45800', '45388', '46455', '45742']);
+  const healthWalletProductIds = new Set(['44036', '45800', '45388', '46455', '45742','38036']);
   const shouldShowHealthWallet = healthWalletProductIds.has(userData?.normalized_product_id ?? userData?.product_id ?? '');
   const hospitalDebtReliefProductIds = new Set(['42463', '45388']);
   const normalizedProductId = userData?.normalized_product_id ?? userData?.product_id;
@@ -317,11 +322,13 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? insets.top + responsiveSize.sm : responsiveSize.xl }]}
+        style={[styles.header, { paddingTop: Math.max(insets.top, responsiveSize.sm) + responsiveSize.sm }]}
       >
         <View style={[styles.headerContent, isTablet && styles.tabletHeaderContent]}>
           <View style={styles.headerTop}>
-            <Animated.Image source={logoImg} style={styles.logo} resizeMode="contain" entering={FadeInUp.delay(150)} />
+            <View style={styles.logoWrapper}>
+              <Animated.Image source={logoImg} style={styles.logo} resizeMode="contain" entering={FadeInUp.delay(150)} />
+            </View>
             <Animated.View style={styles.headerActions} entering={FadeInUp.delay(200)}>
               <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/what-to-do')}>
                 <HelpCircle size={moderateScale(22)} color={colors.primary.main} />
@@ -352,10 +359,11 @@ export default function HomeScreen() {
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
+        overScrollMode="never"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.main} />}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom + responsiveSize.xl, responsiveSize.xl * 2) }
+          { paddingHorizontal: contentPaddingHorizontal, paddingBottom: Math.max(insets.bottom + responsiveSize.xl, responsiveSize.xl * 2) }
         ]}
       >
         {inactiveDateWarning && (
@@ -538,7 +546,7 @@ const styles = StyleSheet.create({
     paddingBottom: responsiveSize.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     width: '100%'
@@ -553,9 +561,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: responsiveSize.md,
+    minHeight: 0,
+  },
+  logoWrapper: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: responsiveSize.sm,
+    justifyContent: 'center',
   },
   headerActions: {
-    flexDirection: 'row'
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: responsiveSize.xs,
   },
 
   iconButton: {
@@ -566,8 +583,7 @@ const styles = StyleSheet.create({
     backgroundColor: rgbaFromHex(colors.primary.main, 0.1),
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: responsiveSize.xs,
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   badgeOuter: {
     position: 'absolute',
@@ -580,7 +596,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 8,
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   badgeInner: {
     width: moderateScale(9),
@@ -591,7 +607,8 @@ const styles = StyleSheet.create({
 
   logo: {
     width: moderateScale(120),
-    height: moderateScale(32)
+    height: moderateScale(32),
+    maxWidth: '100%',
   },
   welcomeSection: {
     paddingLeft: responsiveSize.xs,
@@ -631,6 +648,7 @@ const styles = StyleSheet.create({
   },
   warningContent: {
     flex: 1,
+    minWidth: 0,
   },
   warningTitle: {
     color: colors.status.warning,
@@ -659,22 +677,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: responsiveSize.sm,
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
   },
   quickActionsGridExtraSmall: {
     gap: responsiveSize.xs,
   },
   quickActionCard: {
     flex: 1,
-    minWidth: moderateScale(90),
-    maxWidth: moderateScale(140),
+    minWidth: 0,
+    minHeight: moderateScale(92),
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.lg,
     paddingVertical: responsiveSize.md,
     paddingHorizontal: responsiveSize.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: moderateScale(92),
     ...platformStyles.shadowSm,
   },
   quickActionIconContainer: {
@@ -720,9 +737,13 @@ const styles = StyleSheet.create({
 
   serviceCardContainer: {
     width: '100%',
+    minWidth: 0,
   },
   serviceCardTablet: {
     width: '48%',
+    minWidth: 0,
+    flexGrow: 0,
+    flexShrink: 1,
   },
 
   serviceCard: {
@@ -733,6 +754,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: moderateScale(104),
+    flex: 1,
+    minWidth: 0,
     ...platformStyles.shadowSm,
   },
   serviceCardContent: {
@@ -741,6 +764,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: responsiveSize.xs,
     minWidth: 0,
+    flexShrink: 1,
   },
   serviceIconContainer: {
     width: moderateScale(40),

@@ -15,6 +15,7 @@ export default function BluebookWebView({ url, email }: Props) {
   const [errorMessage, setErrorMessage] = useState('');
 
   const safeEmail = (email ?? '').trim().toLowerCase();
+  const escapedEmail = safeEmail.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ').replace(/\r/g, '');
 
   const handleError = useCallback((e: any) => {
     console.error('[BluebookWebView] Error:', e?.nativeEvent);
@@ -37,51 +38,6 @@ export default function BluebookWebView({ url, email }: Props) {
     ios: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
     default: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   });
-
-  if (Platform.OS === 'android') {
-    return (
-      <View style={{ flex: 1 }}>
-        <WebView
-          ref={webRef}
-          source={{ uri: url }}
-          style={{ flex: 1 }}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          sharedCookiesEnabled={true}
-          userAgent={modernUserAgent}
-          mixedContentMode="always"
-          allowFileAccess={true}
-          allowUniversalAccessFromFileURLs={true}
-          cacheEnabled={true}
-          cacheMode="LOAD_DEFAULT"
-          onError={handleError}
-          onHttpError={handleError}
-          onRenderProcessGone={(e) => {
-            console.error('[BluebookWebView] Process gone:', e?.nativeEvent);
-            setHasError(true);
-            setErrorMessage('WebView crashed');
-          }}
-        />
-
-        {hasError && (
-          <View style={styles.errorOverlay}>
-            <View style={styles.errorCard}>
-              <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-              <SmartText variant="h3" style={styles.errorTitle} maxLines={1}>Unable to Load</SmartText>
-              <SmartText variant="body1" style={styles.errorText} maxLines={2}>
-                {errorMessage || 'The page could not be loaded. Please try again.'}
-              </SmartText>
-              <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-                <RefreshCw size={moderateScale(20)} color={colors.background.default} />
-                <SmartText variant="body1" style={styles.retryButtonText} maxLines={1}>Retry</SmartText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  }
 
   const onMessage = useCallback((e: any) => {
     try {
@@ -146,7 +102,7 @@ export default function BluebookWebView({ url, email }: Props) {
     const CFG = {
       code: 'MPB',
       last: 'MPB Concierge',
-      email: '${safeEmail}',
+      email: '${escapedEmail}',
       dob: '01/01/1999'
     };
 
@@ -159,7 +115,10 @@ export default function BluebookWebView({ url, email }: Props) {
     const click = (el) => {
       if (!el) return;
       el.scrollIntoView?.({block:'center'});
-      el.click();
+      // Dispatch real events so Angular/SPA handlers fire (divs don't have native click)
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
     };
 
     const setVal = (el, v) => {
@@ -206,8 +165,11 @@ export default function BluebookWebView({ url, email }: Props) {
 
         const onAccess = /\\/ui\\/signinpublic/i.test(location.pathname||'');
 
-        if (!onAccess && !document.querySelector('#login-last-name')) {
-          const btn = document.querySelector('a.button.access-code-button[href="/ui/signinpublic"]');
+        const lastEl = document.getElementById('login-last-name') || document.querySelector('input[name*="last" i][name*="name" i]') || document.querySelector('input[placeholder*="last" i]');
+        if (!onAccess && !lastEl) {
+          const btn = document.querySelector('a.button.access-code-button[href="/ui/signinpublic"]') ||
+                      document.querySelector('a[href*="signinpublic" i].button') ||
+                      document.querySelector('.access-code-button');
           if (btn) {
             click(btn);
             post('status', {step:'clicked-access-code'});
@@ -216,20 +178,25 @@ export default function BluebookWebView({ url, email }: Props) {
         }
 
         if (onAccess) {
-          const inp = document.querySelector('.access-code-container input');
-          const next = document.querySelector('.access-code-button, a[href^="javascript"]');
+          const inp = document.querySelector('.access-code-container input') || document.querySelector('input[placeholder*="access" i]') || document.querySelector('.access-code-container input[type="text"]');
+          const next = document.querySelector('div.access-code-button') ||
+                      Array.from(document.querySelectorAll('.access-code-button')).find(function (el) {
+                        return /NEXT/i.test(el.textContent || '');
+                      }) ||
+                      document.querySelector('button[type="submit"]') ||
+                      document.querySelector('.access-code-button');
           if (inp && next) {
             setVal(inp, CFG.code);
-            setTimeout(() => click(next), 100);
+            setTimeout(function () { click(next); }, 100);
             post('status', {step:'entered-access-code'});
             return;
           }
         }
 
-        const last = document.getElementById('login-last-name');
-        const dob = document.getElementById('login-dob');
-        const mail = document.getElementById('login-mbr-supplied-email');
-        const login = document.querySelector('a.button.green.login-command-button');
+        const last = document.getElementById('login-last-name') || document.querySelector('input[name*="last" i][name*="name" i]') || document.querySelector('input[placeholder*="last" i]');
+        const dob = document.getElementById('login-dob') || document.querySelector('input[name*="dob" i]') || document.querySelector('input[placeholder*="date" i][placeholder*="birth" i]');
+        const mail = document.getElementById('login-mbr-supplied-email') || document.querySelector('input[name*="email" i]') || document.querySelector('input[type="email"]');
+        const login = document.querySelector('a.button.green.login-command-button') || document.querySelector('button[type="submit"].green') || document.querySelector('a.button.green') || document.querySelector('button[type="submit"]');
 
         if (last && dob && mail && login && !hasSubmitted) {
           if (last.value !== CFG.last) setVal(last, CFG.last);
@@ -294,10 +261,15 @@ true;
             } catch (e) {
               console.error('[BluebookWebView] Inject failed:', e);
             }
-          }, 300);
+          }, 600);
         }}
         onError={handleError}
         onHttpError={handleError}
+        onRenderProcessGone={Platform.OS === 'android' ? (e) => {
+          console.error('[BluebookWebView] Process gone:', e?.nativeEvent);
+          setHasError(true);
+          setErrorMessage('WebView crashed');
+        } : undefined}
       />
 
       {status ? (

@@ -18,6 +18,7 @@ import { useUserData } from '@/hooks/useUserData';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -33,8 +34,10 @@ function rgbaFromHex(hex: string, alpha: number) {
 
 export default function ChangeEmailScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
   const { userData } = useUserData();
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -112,28 +115,29 @@ export default function ChangeEmailScreen() {
   if (showUpdateMembership) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton onPress={() => setShowUpdateMembership(false)} />
           <View style={styles.headerContent}>
             <SmartText variant="h3" style={styles.headerTitle}>Update Membership</SmartText>
           </View>
         </View>
-        <WebViewContainer url="https://www.cognitoforms.com/MPoweringBenefits1/MemberUpdates" />
+        <WebViewContainer url="https://www.cognitoforms.com/MPoweringBenefits1/MemberUpdates" highSecurity />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>Change Email</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -315,15 +319,16 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
     fontWeight: '700',
     color: colors.text.primary,
     marginLeft: responsiveSize.xs,
+    flex: 1,
+    minWidth: 0,
   },
   headerContent: {
     flex: 1,

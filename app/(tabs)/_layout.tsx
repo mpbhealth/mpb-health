@@ -9,19 +9,34 @@ import { Platform, View, Pressable, StyleSheet } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/hooks/useAuth';
+import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
+const ACTIVE_INDICATOR_HEIGHT = 3;
+
 export default function TabLayout() {
   const { session, loading } = useAuth();
   const insets = useSafeAreaInsets();
   const tabBarHeight = moderateScale(60) + (Platform.OS === 'ios' ? insets.bottom : Math.max(insets.bottom, responsiveSize.sm));
 
-  if (loading) return null;
+  if (loading) return <LoadingIndicator message="Loading…" />;
   if (!session) return <Redirect href="/auth/sign-in" />;
+
+  const handleTabPress = (onPress: () => void) => {
+    try {
+      const Haptics = require('expo-haptics');
+      if (Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch {
+      // expo-haptics not installed
+    }
+    onPress();
+  };
 
   return (
     <Tabs
@@ -48,6 +63,7 @@ export default function TabLayout() {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
+          minHeight: moderateScale(48),
         },
         tabBarIconStyle: {
           marginTop: responsiveSize.xs / 4,
@@ -63,7 +79,7 @@ export default function TabLayout() {
           const animatedStyle = useAnimatedStyle(() => ({
             transform: [
               {
-                scale: withSpring(focused ? 1.08 : 1, {
+                scale: withSpring(focused ? 1.06 : 1, {
                   mass: 1,
                   damping: 15,
                   stiffness: 200,
@@ -77,12 +93,20 @@ export default function TabLayout() {
           }));
           return (
             <Pressable
-              onPress={onPress}
+              onPress={() => handleTabPress(onPress)}
               style={styles.tabPressable}
               android_ripple={{ color: `${colors.primary.main}15`, borderless: false }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
             >
               <AnimatedView style={[styles.tabAnimated, animatedStyle]}>
                 {children}
+                <View
+                  style={[
+                    styles.activeIndicator,
+                    { opacity: focused ? 1 : 0 },
+                  ]}
+                />
               </AnimatedView>
             </Pressable>
           );
@@ -94,6 +118,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <HomeIcon size={moderateScale(24)} color={color} />,
+          tabBarAccessibilityLabel: 'Home',
         }}
       />
       <Tabs.Screen
@@ -101,6 +126,7 @@ export default function TabLayout() {
         options={{
           title: 'Concierge',
           tabBarIcon: ({ color }) => <MessageCircle size={moderateScale(24)} color={color} />,
+          tabBarAccessibilityLabel: 'Concierge chat',
         }}
       />
       <Tabs.Screen
@@ -108,6 +134,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <UserIcon size={moderateScale(24)} color={color} />,
+          tabBarAccessibilityLabel: 'Profile',
         }}
       />
     </Tabs>
@@ -125,7 +152,6 @@ const styles = StyleSheet.create({
   },
   tabBarAndroid: {
     backgroundColor: colors.background.default,
-    elevation: moderateScale(8),
   },
   tabPressable: {
     flex: 1,
@@ -140,5 +166,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: responsiveSize.xs,
     paddingHorizontal: responsiveSize.sm,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '25%',
+    right: '25%',
+    height: ACTIVE_INDICATOR_HEIGHT,
+    borderRadius: ACTIVE_INDICATOR_HEIGHT / 2,
+    backgroundColor: colors.primary.main,
   },
 });

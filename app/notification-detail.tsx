@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { BackButton } from '@/components/common/BackButton';
 import { Home, Play, Tag, MessageSquare, Shield, UserCog } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
 
 // adjust this relative path if your file lives elsewhere; assumes logo is at <project>/assets/images/logo.png
@@ -13,6 +14,7 @@ const logoImg = require('../assets/images/logo.png');
 
 export default function NotificationDetailScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
 
   const sections = [
     {
@@ -112,12 +114,17 @@ export default function NotificationDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <Text style={styles.title} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Welcome Guide</Text>
       </Animated.View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: scrollContentPaddingBottom }}
+      >
         <Animated.View style={styles.welcomeCard} entering={FadeInUp.delay(200)}>
           <View style={styles.logoContainer}>
             <Image source={logoImg} style={styles.logo} resizeMode="contain" />
@@ -199,7 +206,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
     ...shadows.sm,
@@ -208,7 +214,8 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.text.primary,
     marginLeft: spacing.sm,
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
   content: {
     flex: 1,

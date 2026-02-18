@@ -8,6 +8,7 @@ import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { useUserData } from '@/hooks/useUserData';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { supabase } from '@/lib/supabase';
 import { colors, borderRadius } from '@/constants/theme';
@@ -25,25 +26,67 @@ interface Dependent {
   relationship: string;
 }
 
+interface PrimaryInfo {
+  first_name: string | null;
+  last_name: string | null;
+  product_label: string | null;
+  product_benefit: string | null;
+}
+
 export default function PlanDetailsScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { userData, loading: userLoading } = useUserData();
+  const [primaryInfo, setPrimaryInfo] = useState<PrimaryInfo | null>(null);
   const [dependents, setDependents] = useState<Dependent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showHandbook, setShowHandbook] = useState(false);
 
   useEffect(() => {
-    async function fetchDependents() {
+    async function fetchPlanDetails() {
       if (!userData?.member_id) {
         setLoading(false);
         return;
       }
 
+      const isPrimary = Boolean(userData.is_primary);
+      const primaryMemberId = isPrimary ? userData.member_id : (userData.primary_id || null);
+
       try {
+        if (isPrimary) {
+          setPrimaryInfo({
+            first_name: userData.first_name ?? null,
+            last_name: userData.last_name ?? null,
+            product_label: userData.product_label ?? null,
+            product_benefit: userData.product_benefit ?? null,
+          });
+        } else if (primaryMemberId) {
+          const { data: primaryData, error: primaryError } = await supabase
+            .from('members')
+            .select('first_name, last_name, product_label, product_benefit')
+            .eq('member_id', primaryMemberId)
+            .eq('is_primary', true)
+            .maybeSingle();
+
+          if (!primaryError && primaryData) {
+            setPrimaryInfo({
+              first_name: primaryData.first_name ?? null,
+              last_name: primaryData.last_name ?? null,
+              product_label: primaryData.product_label ?? null,
+              product_benefit: primaryData.product_benefit ?? null,
+            });
+          }
+        }
+
+        if (!primaryMemberId) {
+          setLoading(false);
+          return;
+        }
+
         const { data: membersData, error: membersError } = await supabase
           .from('members')
           .select('member_id, first_name, last_name, product_label, product_benefit, relationship')
-          .eq('primary_id', userData.member_id)
+          .eq('primary_id', primaryMemberId)
           .eq('is_primary', false);
 
         if (membersError) throw membersError;
@@ -61,14 +104,14 @@ export default function PlanDetailsScreen() {
 
         setDependents(sortedDependents);
       } catch (err) {
-        console.error('Error fetching dependents:', err);
+        console.error('Error fetching plan details:', err);
       } finally {
         setLoading(false);
       }
     }
 
     if (!userLoading) {
-      fetchDependents();
+      fetchPlanDetails();
     }
   }, [userData, userLoading]);
 
@@ -81,6 +124,7 @@ export default function PlanDetailsScreen() {
     return null;
   }
 
+  const isPrimary = Boolean(userData?.is_primary);
   const getPlanDetailsUrl = (productId: string) => {
     const urlMap: { [key: string]: string } = {
       '42463': 'https://mpb.health/3d-flip-book/essentials/',
@@ -103,7 +147,7 @@ export default function PlanDetailsScreen() {
   if (showHandbook) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <TouchableOpacity
             onPress={() => setShowHandbook(false)}
             style={styles.closeButton}
@@ -115,14 +159,14 @@ export default function PlanDetailsScreen() {
             <SmartText variant="h3" style={styles.headerTitle}>Membership Handbook</SmartText>
           </View>
         </View>
-        <WebViewContainer url={planDetailsUrl} />
+        <WebViewContainer url={planDetailsUrl} highSecurity />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
           <SmartText variant="h3" style={styles.headerTitle}>Plan Details</SmartText>
@@ -131,67 +175,72 @@ export default function PlanDetailsScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInDown.delay(100)}>
-          <Card padding="lg" variant="elevated" style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.iconContainer}>
-                <User size={moderateScale(24)} color={colors.primary.main} />
+        {primaryInfo && (
+          <Animated.View entering={FadeInDown.delay(100)}>
+            <Card padding="lg" variant="elevated" style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.iconContainer}>
+                  <User size={moderateScale(24)} color={colors.primary.main} />
+                </View>
+                <SmartText variant="h4" style={styles.cardTitle}>Primary Member</SmartText>
               </View>
-              <SmartText variant="h4" style={styles.cardTitle}>Primary Member</SmartText>
-            </View>
 
-            <View style={styles.memberInfo}>
-              <SmartText variant="body1" style={styles.memberName}>
-                {userData?.first_name} {userData?.last_name}
-              </SmartText>
-
-              <View style={styles.infoRow}>
-                <SmartText variant="caption" style={styles.label}>Plan Type</SmartText>
-                <SmartText variant="body1" style={styles.value}>
-                  {userData?.product_label || 'N/A'}
+              <View style={styles.memberInfo}>
+                <SmartText variant="body1" style={styles.memberName}>
+                  {primaryInfo.first_name} {primaryInfo.last_name}
                 </SmartText>
-              </View>
 
-              {userData?.product_benefit && (
                 <View style={styles.infoRow}>
-                  <SmartText variant="caption" style={styles.label}>Benefit Level</SmartText>
+                  <SmartText variant="caption" style={styles.label}>Plan Type</SmartText>
                   <SmartText variant="body1" style={styles.value}>
-                    {userData.product_benefit}
+                    {primaryInfo.product_label || 'N/A'}
                   </SmartText>
                 </View>
-              )}
 
-              {userData?.is_primary && (
-                <View style={styles.coverageBadge}>
-                  <Users size={moderateScale(16)} color={colors.primary.main} />
-                  <SmartText variant="body2" style={styles.coverageText}>
-                    {dependents.length > 0
-                      ? `${dependents.length + 1} ${dependents.length + 1 === 1 ? 'person' : 'people'} covered`
-                      : '1 person covered'
-                    }
-                  </SmartText>
-                </View>
-              )}
+                {primaryInfo.product_benefit && (
+                  <View style={styles.infoRow}>
+                    <SmartText variant="caption" style={styles.label}>Benefit Level</SmartText>
+                    <SmartText variant="body1" style={styles.value}>
+                      {primaryInfo.product_benefit}
+                    </SmartText>
+                  </View>
+                )}
+
+                {(isPrimary || dependents.length > 0) && (
+                  <View style={styles.coverageBadge}>
+                    <Users size={moderateScale(16)} color={colors.primary.main} />
+                    <SmartText variant="body2" style={styles.coverageText}>
+                      {dependents.length > 0
+                        ? `${dependents.length + 1} ${dependents.length + 1 === 1 ? 'person' : 'people'} covered`
+                        : '1 person covered'
+                      }
+                    </SmartText>
+                  </View>
+                )}
+              </View>
+            </Card>
+          </Animated.View>
+        )}
+
+        {normalizedProductId !== '38036' && (
+          <AnimatedTouchable
+            entering={FadeInUp.delay(200)}
+            style={styles.readMoreButton}
+            onPress={() => setShowHandbook(true)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.buttonContent}>
+              <BookOpen size={moderateScale(20)} color="#fff" />
+              <SmartText variant="h4" style={styles.buttonText}>
+                Read Membership Handbook
+              </SmartText>
             </View>
-          </Card>
-        </Animated.View>
-
-        <AnimatedTouchable
-          entering={FadeInUp.delay(200)}
-          style={styles.readMoreButton}
-          onPress={() => setShowHandbook(true)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.buttonContent}>
-            <BookOpen size={moderateScale(20)} color="#fff" />
-            <SmartText variant="h4" style={styles.buttonText}>
-              Read Membership Handbook
-            </SmartText>
-          </View>
-        </AnimatedTouchable>
+          </AnimatedTouchable>
+        )}
 
         {dependents.length > 0 && (
           <Animated.View entering={FadeInUp.delay(300)}>
@@ -300,16 +349,16 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.sm,
+    minWidth: 0,
   },
   headerTitle: {
     color: colors.text.primary,

@@ -1,5 +1,9 @@
 // src/components/common/WebViewContainer.tsx
 
+/**
+ * WebViewContainer – in-app browser with progress, error handling, and security.
+ */
+
 import React, {
   forwardRef,
   useRef,
@@ -7,6 +11,7 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useCallback,
   ForwardedRef,
 } from 'react';
 import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
@@ -26,9 +31,13 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { RefreshCw, ExternalLink } from 'lucide-react-native';
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, platformStyles, MIN_TOUCH_TARGET } from '@/utils/scaling';
+
+const LOAD_TIMEOUT_MS = 25000;
+const PROGRESS_RESET_DELAY_MS = 400;
 
 /** Backward-compatible props (your existing ones) + a few optional niceties */
 interface WebViewContainerProps {
@@ -74,6 +83,22 @@ interface WebViewContainerProps {
 
   /** Optional: disable UX enhancements for special widgets like chat (default: false) */
   disableEnhancements?: boolean;
+  /** Optional: message shown under the loading spinner */
+  loadingMessage?: string;
+  /**
+   * High-security mode for payment, health, and banking sites.
+   * When true: HTTPS-only origin whitelist, no mixed content, no file access,
+   * no cache, and blocks non-HTTPS navigation. Use for portals that require strict TLS.
+   */
+  highSecurity?: boolean;
+  /**
+   * Hosts that block or restrict in-app WebViews (e.g. Zocdoc).
+   * When the initial URL matches, we show "Open in browser" UI instead of loading in WebView.
+   * Pass hostnames or RegExp (e.g. [/zocdoc\.com/i]). Optional: set openInBrowserAutoOpen to open on mount.
+   */
+  openInBrowserHosts?: (string | RegExp)[];
+  /** When true and url matches openInBrowserHosts, open in system browser immediately and show the same UI. */
+  openInBrowserAutoOpen?: boolean;
 }
 
 /** Comprehensive UX & security injection */
@@ -218,6 +243,10 @@ export const WebViewContainer = forwardRef(
       cookieStorageKey = 'webview_cookies',
       allowNestedFrames = false,
       disableEnhancements = false,
+      loadingMessage,
+      highSecurity = false,
+      openInBrowserHosts = [],
+      openInBrowserAutoOpen = false,
     }: WebViewContainerProps,
     ref: ForwardedRef<WebView>,
   ) => {
@@ -253,10 +282,15 @@ export const WebViewContainer = forwardRef(
       [],
     );
 
+    // High-security: HTTPS-only whitelist; otherwise allow all origins for compatibility
+    const originWhitelist = useMemo(
+      () => (highSecurity ? ['https://*'] : ['*']),
+      [highSecurity],
+    );
+
     // External open rules
     const ALWAYS_EXTERNAL_HOSTS: (RegExp | string)[] = useMemo(
       () => [
-        /(^|\.)zocdoc\.com$/i,
         /(^|\.)accounts\.google\.com$/i,
         /(^|\.)paypal\.com$/i,
         ...externalHosts,
@@ -271,6 +305,19 @@ export const WebViewContainer = forwardRef(
         return '';
       }
     };
+
+    const urlHostMatches = (u: string, patterns: (string | RegExp)[]) => {
+      const host = urlToHost(u);
+      if (!host) return false;
+      return patterns.some((p) =>
+        typeof p === 'string' ? host === p || host.endsWith('.' + p) : p.test(host),
+      );
+    };
+
+    const shouldOpenInBrowser = useMemo(
+      () => openInBrowserHosts.length > 0 && urlHostMatches(url, openInBrowserHosts),
+      [url, openInBrowserHosts],
+    );
 
     const shouldOpenExternally = (u: string) => {
       const host = urlToHost(u);
@@ -289,6 +336,12 @@ export const WebViewContainer = forwardRef(
         RNLinking.openURL(u);
       }
     };
+
+    // When URL is in openInBrowserHosts and auto-open is on, open in browser on mount
+    useEffect(() => {
+      if (!shouldOpenInBrowser || !openInBrowserAutoOpen || !url) return;
+      openExternal(url);
+    }, [shouldOpenInBrowser, openInBrowserAutoOpen, url]);
 
     // Save/load cookies for persistent login
     useEffect(() => {
@@ -341,10 +394,10 @@ export const WebViewContainer = forwardRef(
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       loadTimeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) setIsLoading(false);
-      }, 20000);
+      }, LOAD_TIMEOUT_MS);
     };
 
-    const handleLoadEnd = () => {
+    const handleLoadEnd = useCallback(() => {
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       if (!isMountedRef.current) return;
       setIsLoading(false);
@@ -353,8 +406,8 @@ export const WebViewContainer = forwardRef(
       setProgress(1);
       setTimeout(() => {
         if (isMountedRef.current) setProgress(0);
-      }, 400);
-    };
+      }, PROGRESS_RESET_DELAY_MS);
+    }, [onLoadEnd]);
 
     const handleLoadError = (e: any) => {
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -436,34 +489,84 @@ export const WebViewContainer = forwardRef(
     const uxInject = getUXInject(disableEnhancements);
     const combinedInjectedJS = `${uxInject}\n;${injectedJavaScript || ''}`;
 
-    // Error view
-    if (hasError) {
+    // Sites that block WebViews: show "Open in browser" UI instead of loading in WebView
+    if (shouldOpenInBrowser) {
       return (
-        <View style={[styles.container, dark && { backgroundColor: colors.background.paper }]}>
+        <View style={[styles.container, dark && styles.containerDark]}>
           <View style={styles.errorContainer}>
+            <View style={styles.errorIconWrap}>
+              <ExternalLink size={moderateScale(40)} color={colors.primary.main} />
+            </View>
             <SmartText
               variant="h3"
-              style={[styles.errorTitle, dark && { color: colors.text.primary }]}
+              style={[styles.errorTitle, dark && styles.errorTitleDark]}
+              maxLines={2}
+            >
+              Opens in your browser
+            </SmartText>
+            <SmartText
+              variant="body1"
+              style={[styles.errorText, dark && styles.errorTextDark]}
+              maxLines={4}
+            >
+              This site doesn't support in-app viewing. Tap below to open it in your browser for the best experience.
+            </SmartText>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => openExternal(url)}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+              accessibilityLabel="Open in browser"
+            >
+              <ExternalLink size={moderateScale(20)} color={colors.background.default} />
+              <SmartText variant="body1" style={styles.retryButtonText}>Open in Browser</SmartText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (hasError) {
+      return (
+        <View style={[styles.container, dark && styles.containerDark]}>
+          <View style={styles.errorContainer}>
+            <View style={styles.errorIconWrap}>
+              <RefreshCw size={moderateScale(40)} color={colors.status.error} />
+            </View>
+            <SmartText
+              variant="h3"
+              style={[styles.errorTitle, dark && styles.errorTitleDark]}
               maxLines={2}
             >
               Something went wrong
             </SmartText>
             <SmartText
               variant="body1"
-              style={[styles.errorText, dark && { color: colors.text.secondary }]}
-              maxLines={2}
+              style={[styles.errorText, dark && styles.errorTextDark]}
+              maxLines={3}
             >
-              We couldn't load this page right now.
+              We couldn't load this page. Check your connection or try opening it in your browser.
             </SmartText>
             <View style={styles.errorActions}>
-              <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-                <SmartText variant="body1" style={styles.retryButtonText} maxLines={1}>Retry</SmartText>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRetry}
+                activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading page"
+              >
+                <RefreshCw size={moderateScale(20)} color={colors.background.default} />
+                <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.openButton]}
+                style={styles.openButton}
                 onPress={() => openExternal(url)}
+                activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel="Open in browser"
               >
-                <SmartText variant="body1" style={styles.openButtonText} maxLines={1}>Open in Browser</SmartText>
+                <ExternalLink size={moderateScale(20)} color={colors.text.primary} />
+                <SmartText variant="body1" style={styles.openButtonText}>Open in Browser</SmartText>
               </TouchableOpacity>
             </View>
           </View>
@@ -492,13 +595,13 @@ export const WebViewContainer = forwardRef(
 
         <WebView
           ref={webViewRef as any}
-          originWhitelist={['*']}
+          originWhitelist={originWhitelist}
           source={source}
           style={[styles.webview, style]}
           injectedJavaScript={combinedInjectedJS}
           javaScriptEnabled={javaScriptEnabled}
           domStorageEnabled={domStorageEnabled}
-          mixedContentMode="always"
+          mixedContentMode={highSecurity ? 'never' : 'always'}
           thirdPartyCookiesEnabled
           sharedCookiesEnabled
           scrollEnabled={scrollEnabled}
@@ -511,59 +614,55 @@ export const WebViewContainer = forwardRef(
           onLoadProgress={handleProgress}
           startInLoadingState={false}
           userAgent={userAgent ?? defaultUA}
-          allowFileAccess
-          allowUniversalAccessFromFileURLs
+          allowFileAccess={!highSecurity}
+          allowUniversalAccessFromFileURLs={!highSecurity}
           mediaPlaybackRequiresUserAction={false}
-          javaScriptCanOpenWindowsAutomatically
-          // iOS "in-page" swipe (not the stack swipe) for WebView history
+          javaScriptCanOpenWindowsAutomatically={!highSecurity}
           allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
-          // keyboard props
           keyboardDisplayRequiresUserAction={keyboardDisplayRequiresUserAction}
           hideKeyboardAccessoryView={hideKeyboardAccessoryView}
-          // Pull to refresh (Android native)
           pullToRefreshEnabled={enablePullToRefresh && Platform.OS === 'android'}
-          // New window / _blank (disable to prevent popup issues)
           setSupportMultipleWindows={false}
           // Intercept navigations (incl. target=_blank and external intents)
           onShouldStartLoadWithRequest={(req) => {
             const nextUrl = req?.url ?? '';
 
-            // Security: Block javascript: and data: URLs
+            // Security: Block javascript:, data:, and file: (file: blocked in high-security)
             if (/^(javascript:|data:)/i.test(nextUrl)) {
-              console.warn('Blocked potentially malicious URL:', nextUrl);
+              return false;
+            }
+            if (highSecurity && /^file:\/\//i.test(nextUrl)) {
+              return false;
+            }
+            // High-security: only allow HTTPS loads in the WebView (other schemes already handled above)
+            if (highSecurity && !/^https:\/\//i.test(nextUrl)) {
               return false;
             }
 
-            // External protocols
+            // External protocols: open in OS
             if (/^(intent:|tel:|mailto:|sms:|maps:|geo:)/i.test(nextUrl)) {
               RNLinking.openURL(nextUrl);
               return false;
             }
 
-            // Force external for some hosts
             if (shouldOpenExternally(nextUrl)) {
               openExternal(nextUrl);
               return false;
             }
 
-            // Security: Prevent navigation to blocked domains
-            const blockedDomains = ['phishing.com', 'malware.com']; // Add actual blocked domains
             const host = urlToHost(nextUrl);
-            if (blockedDomains.some(d => host.includes(d))) {
-              console.warn('Blocked navigation to:', nextUrl);
+            const blockedDomains = ['phishing.com', 'malware.com'];
+            if (blockedDomains.some((d) => host.includes(d))) {
               return false;
             }
 
-            // Allow normal navigation inside
             return true;
           }}
           // Handle HTTP errors gracefully
           onHttpError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
-            console.warn('HTTP Error:', nativeEvent.statusCode, nativeEvent.url);
-            if (nativeEvent.statusCode >= 500) {
-              setHasError(true);
-            }
+            const code = nativeEvent.statusCode ?? 0;
+            if (code >= 400) setHasError(true);
           }}
           // Handle render process crashes (Android)
           onRenderProcessGone={(syntheticEvent) => {
@@ -581,19 +680,18 @@ export const WebViewContainer = forwardRef(
           }}
           // iOS-only: content inset adjust for better fit
           contentInsetAdjustmentBehavior="automatic"
-          // Prevent memory leaks on Android
           androidLayerType="hardware"
-          // Better performance
-          cacheEnabled={true}
-          cacheMode="LOAD_DEFAULT"
-          // Incognito mode (no persistent storage)
+          cacheEnabled={!highSecurity}
+          cacheMode={highSecurity && Platform.OS === 'android' ? 'LOAD_NO_CACHE' : 'LOAD_DEFAULT'}
           incognito={!persistCookies}
         />
 
-        {/* Global loader overlay (subtle, app-colored) */}
         {isLoading && (
-          <View style={[styles.loadingContainer, { backgroundColor: dark ? '#00000022' : `${colors.background.default}DD` }]}>
+          <View style={[styles.loadingContainer, dark && styles.loadingContainerDark]}>
             <ActivityIndicator size="large" color={colors.primary.main} />
+            {loadingMessage ? (
+              <SmartText variant="body2" style={styles.loadingMessage}>{loadingMessage}</SmartText>
+            ) : null}
           </View>
         )}
       </View>
@@ -604,13 +702,15 @@ export const WebViewContainer = forwardRef(
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.default
+    backgroundColor: colors.background.default,
+  },
+  containerDark: {
+    backgroundColor: colors.background.paper,
   },
   webview: {
     flex: 1,
     backgroundColor: colors.background.default,
   },
-
   progressBar: {
     position: 'absolute',
     top: 0,
@@ -618,61 +718,89 @@ const styles = StyleSheet.create({
     height: moderateScale(3),
     backgroundColor: colors.primary.main,
     zIndex: 1000,
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
-
-  // Loading overlay
   loadingContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    backgroundColor: `${colors.background.default}F5`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: `${colors.background.default}EE`,
+    gap: responsiveSize.md,
   },
-
+  loadingContainerDark: {
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
+  loadingMessage: {
+    color: colors.text.secondary,
+    marginTop: responsiveSize.sm,
+  },
   errorContainer: {
     flex: 1,
     padding: responsiveSize.xxl,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: responsiveSize.md,
+  },
+  errorIconWrap: {
+    marginBottom: responsiveSize.sm,
+    opacity: 0.9,
   },
   errorTitle: {
     color: colors.text.primary,
-    textAlign: 'center' as const,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  errorTitleDark: {
+    color: colors.text.primary,
   },
   errorText: {
     color: colors.text.secondary,
-    textAlign: 'center' as const,
+    textAlign: 'center',
+    paddingHorizontal: responsiveSize.lg,
+  },
+  errorTextDark: {
+    color: colors.text.secondary,
   },
   errorActions: {
-    flexDirection: 'row' as const,
+    flexDirection: 'row',
     gap: responsiveSize.md,
-    flexWrap: 'wrap' as const,
-    justifyContent: 'center' as const,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: responsiveSize.sm,
   },
   retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: responsiveSize.sm,
     backgroundColor: colors.primary.main,
     paddingHorizontal: responsiveSize.lg,
     paddingVertical: responsiveSize.md,
     borderRadius: borderRadius.lg,
-    ...platformStyles.shadowMd,
+    minHeight: MIN_TOUCH_TARGET,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   retryButtonText: {
     color: colors.background.default,
+    fontWeight: '600',
   },
   openButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: responsiveSize.sm,
     backgroundColor: colors.gray[100],
     paddingHorizontal: responsiveSize.lg,
     paddingVertical: responsiveSize.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.gray[200],
+    minHeight: MIN_TOUCH_TARGET,
   },
   openButtonText: {
     color: colors.text.primary,
+    fontWeight: '600',
   },
 });

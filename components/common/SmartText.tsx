@@ -77,17 +77,21 @@ interface SmartTextProps extends TextProps {
   maxLines?: number;
 }
 
+const SCALEABLE_VARIANTS = new Set(['body1', 'body2', 'caption']);
+
 export const SmartText: React.FC<SmartTextProps> = ({
   children,
   variant = 'body1',
   truncate = false,
   maxLines,
   style,
-  allowFontScaling = false,
+  allowFontScaling,
   ...props
 }) => {
   const typography = createTypography();
   const variantStyle = typography[variant];
+  // Respect system font size for body/caption (accessibility); headings stay fixed for layout
+  const scaleFont = allowFontScaling ?? SCALEABLE_VARIANTS.has(variant);
 
   const minimumFontSizes: Record<string, number> = {
     display1: 22,
@@ -125,7 +129,7 @@ export const SmartText: React.FC<SmartTextProps> = ({
       style={[adjustedStyle, style]}
       numberOfLines={truncate ? (maxLines || 1) : maxLines}
       ellipsizeMode={truncate ? 'tail' : undefined}
-      allowFontScaling={allowFontScaling}
+      allowFontScaling={scaleFont}
       maxFontSizeMultiplier={maxFontSizeMultipliers[variant]}
       adjustsFontSizeToFit={truncate && maxLines === 1}
       minimumFontScale={0.85}

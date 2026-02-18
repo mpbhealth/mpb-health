@@ -22,13 +22,16 @@ import {
   spacing,
   borderRadius,
 } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function HospitalDebtReliefScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const [codeCopied, setCodeCopied] = useState(false);
   const [showApplicationWebView, setShowApplicationWebView] = useState(false);
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   const employerCode = 'ss10610';
 
@@ -46,25 +49,30 @@ export default function HospitalDebtReliefScreen() {
   if (showApplicationWebView) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton onPress={() => setShowApplicationWebView(false)} />
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Debt Dismissal Application</Text>
           </View>
         </View>
-        <WebViewContainer url="https://debtdismissal.myfa.app/" />
+        <WebViewContainer url="https://debtdismissal.myfa.app/" highSecurity />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Hospital Debt Relief</Text>
       </Animated.View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: scrollContentPaddingBottom }}
+      >
         <Animated.View style={styles.introCard} entering={FadeInUp.delay(200)}>
           <Heart size={24} color={colors.primary.main} />
           <View style={styles.introContent}>
@@ -143,7 +151,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
     ...shadows.sm,
@@ -151,6 +158,7 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
     marginLeft: spacing.sm,
+    minWidth: 0,
   },
   headerTitle: {
     ...typography.h3,

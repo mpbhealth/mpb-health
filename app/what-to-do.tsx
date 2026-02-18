@@ -7,10 +7,12 @@ import { Heart, Phone, Ambulance, Calendar, AlertCircle } from 'lucide-react-nat
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 
 export default function WhatToDoScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
 
   const sections = [
@@ -90,7 +92,7 @@ export default function WhatToDoScreen() {
   return (
     <View style={styles.container}>
       <Animated.View
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
@@ -98,9 +100,10 @@ export default function WhatToDoScreen() {
       </Animated.View>
 
       <ScrollView
+        overScrollMode="never"
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -178,15 +181,16 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
     fontWeight: '700',
     color: colors.text.primary,
     marginLeft: responsiveSize.xs,
+    flex: 1,
+    minWidth: 0,
   },
   content: {
     flex: 1,

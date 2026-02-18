@@ -9,14 +9,17 @@ import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { useState } from 'react';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
   const [showFullPolicy, setShowFullPolicy] = useState(false);
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   const sections = [
     {
@@ -57,7 +60,7 @@ export default function PrivacyPolicyScreen() {
   if (showFullPolicy) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton onPress={() => setShowFullPolicy(false)} />
           <View style={styles.headerContent}>
             <SmartText variant="h3" style={styles.headerTitle}>Privacy Policy</SmartText>
@@ -71,7 +74,7 @@ export default function PrivacyPolicyScreen() {
   return (
     <View style={styles.container}>
       <Animated.View
-        style={styles.header}
+        style={headerStyle}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
@@ -80,8 +83,9 @@ export default function PrivacyPolicyScreen() {
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -161,14 +165,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '600',

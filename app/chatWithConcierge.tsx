@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { MessageSquare } from 'lucide-react-native';
 import { BackButton } from '@/components/common/BackButton';
@@ -153,6 +154,7 @@ const htmlContent = `
 export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { headerPaddingTop } = useSafeHeaderPadding();
   const [isChatActive, setIsChatActive] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -204,7 +206,7 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
         <BackButton onPress={confirmExit} />
         <View style={styles.titleContainer}>
           <MessageSquare size={moderateScale(24)} color={colors.primary.main} />
@@ -296,12 +298,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: responsiveSize.md,
     backgroundColor: colors.background.default,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   titleContainer: {
     flexDirection: 'row',

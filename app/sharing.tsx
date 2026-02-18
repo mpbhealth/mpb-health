@@ -10,6 +10,7 @@ import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 import Animated, {
   FadeInDown,
@@ -18,8 +19,6 @@ import Animated, {
   SlideInRight,
   SlideOutLeft
 } from 'react-native-reanimated';
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -32,6 +31,7 @@ function rgbaFromHex(hex: string, alpha: number) {
 
 export default function SharingScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
   const { userData, loading } = useUserData();
   const [selectedProgram, setSelectedProgram] = useState<{
@@ -49,7 +49,7 @@ export default function SharingScreen() {
   ];
 
   // Product IDs that should see Sedera Health
-  const sederaHealthProductIds = ['43957', '44036','46455', ,'38035'];
+  const sederaHealthProductIds = ['43957', '44036','46455', ,'38035','38036'];
 
   // Determine which programs to show based on product_id
   const availablePrograms = [];
@@ -87,7 +87,7 @@ export default function SharingScreen() {
         entering={SlideInRight}
         exiting={SlideOutLeft}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <BackButton onPress={() => setSelectedProgram(null)} />
           <View style={styles.headerContent}>
             <SmartText variant="h3" style={styles.headerTitle}>{selectedProgram.title}</SmartText>
@@ -102,7 +102,7 @@ export default function SharingScreen() {
   return (
     <View style={styles.container}>
       <Animated.View
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
@@ -111,8 +111,9 @@ export default function SharingScreen() {
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -123,28 +124,31 @@ export default function SharingScreen() {
 
           <View style={styles.programsGrid}>
             {availablePrograms.map((program, index) => (
-              <AnimatedTouchableOpacity
+              <Animated.View
                 key={program.title}
-                style={styles.programCard}
-                onPress={() => setSelectedProgram(program)}
                 entering={FadeInUp.delay(300 + index * 100)}
                 layout={Layout.springify()}
               >
-                <View style={styles.programContent}>
-                  <View style={[styles.iconContainer, { backgroundColor: program.gradient }]}>
-                    <Building2 size={moderateScale(26)} color={program.color} />
+                <TouchableOpacity
+                  style={styles.programCard}
+                  onPress={() => setSelectedProgram(program)}
+                >
+                  <View style={styles.programContent}>
+                    <View style={[styles.iconContainer, { backgroundColor: program.gradient }]}>
+                      <Building2 size={moderateScale(26)} color={program.color} />
+                    </View>
+                    <View style={styles.textContainer}>
+                      <SmartText variant="body1" style={styles.programTitle}>
+                        {program.title}
+                      </SmartText>
+                      <SmartText variant="body2" style={styles.programDescription}>
+                        {program.description}
+                      </SmartText>
+                    </View>
                   </View>
-                  <View style={styles.textContainer}>
-                    <SmartText variant="body1" style={styles.programTitle}>
-                      {program.title}
-                    </SmartText>
-                    <SmartText variant="body2" style={styles.programDescription}>
-                      {program.description}
-                    </SmartText>
-                  </View>
-                </View>
-                <ExternalLink size={moderateScale(18)} color={program.color} />
-              </AnimatedTouchableOpacity>
+                  <ExternalLink size={moderateScale(18)} color={program.color} />
+                </TouchableOpacity>
+              </Animated.View>
             ))}
           </View>
 
@@ -172,14 +176,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '600',
@@ -189,6 +193,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text.primary,
     marginLeft: responsiveSize.xs,
+    flex: 1,
+    minWidth: 0,
   },
   content: {
     flex: 1,

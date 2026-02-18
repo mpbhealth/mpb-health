@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import {
   Shield,
   Phone,
@@ -34,8 +35,10 @@ import { colors, shadows, typography, spacing, borderRadius } from '@/constants/
 export default function SecureHSAScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   const { userData, loading } = useUserData();
   const [showPlanDetails, setShowPlanDetails] = useState(false);
@@ -49,7 +52,7 @@ export default function SecureHSAScreen() {
   if (showCancellation) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => setShowCancellation(false)} />
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Cancel Membership</Text>
@@ -66,7 +69,7 @@ export default function SecureHSAScreen() {
   if (showPlanDetails) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => setShowPlanDetails(false)} />
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Plan Details</Text>
@@ -94,7 +97,7 @@ export default function SecureHSAScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Plan Details</Text>
       </Animated.View>
@@ -102,8 +105,9 @@ export default function SecureHSAScreen() {
       {/* Content */}
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
+        contentContainerStyle={{ paddingBottom: scrollContentPaddingBottom }}
       >
         {/* Profile */}
         <Animated.View style={styles.profileCard} entering={FadeInUp.delay(200)}>
@@ -179,13 +183,12 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     paddingHorizontal: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     ...shadows.sm,
   },
-  headerContent: { flex: 1, marginLeft: spacing.sm },
+  headerContent: { flex: 1, marginLeft: spacing.sm, minWidth: 0 },
   headerTitle: { ...typography.h3, color: colors.text.primary },
   title: { ...typography.h2, color: colors.text.primary, marginLeft: spacing.sm },
 

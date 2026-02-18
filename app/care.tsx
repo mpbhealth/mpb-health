@@ -11,6 +11,7 @@ import {
   ExternalLink,
   AlertCircle,
   RefreshCw,
+  Heart,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -24,25 +25,37 @@ import Animated, {
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import BluebookWebView from '@/components/common/BluebookWebView';
+import { ProviderSearchWebView, isMultiplanProviderSearchUrl } from '@/components/common/ProviderSearchWebView';
 import { SmartText } from '@/components/common/SmartText';
+import { EmptyState } from '@/components/common/EmptyState';
 import { useCareServices, type CareService } from '@/hooks/useCareServices';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useUserData } from '@/hooks/useUserData';
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+/** Hosts that block or restrict in-app WebViews; WebViewContainer opens them in the system browser. */
+const OPEN_IN_BROWSER_HOSTS: RegExp[] = [/zocdoc\.com/i];
 
 export default function CareScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
   const { userData } = useUserData();
-  const { services, loading, error, refetch } = useCareServices();
+  // Match both normalized and raw product_id so care_services rows with 47182 or 42464 both show for members with product_id 47182
+  const normalizedPid = userData?.normalized_product_id ?? userData?.product_id ?? null;
+  const rawPid = userData?.product_id ?? null;
+  const userProductIds = [normalizedPid, rawPid].filter(Boolean) as string[];
+  const userProductIdList = userProductIds.length > 0 ? Array.from(new Set(userProductIds)) : null;
+  const { services, loading, error, refetch } = useCareServices(userProductIdList);
   const [selectedService, setSelectedService] = useState<CareService | null>(null);
   const [webViewError, setWebViewError] = useState(false);
+  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
 
   if (selectedService) {
     const isBluebook = selectedService.serviceKey === 'bluebook';
+    const isMultiplanProviderSearch = isMultiplanProviderSearchUrl(selectedService.url);
 
     return (
       <Animated.View
@@ -50,7 +63,7 @@ export default function CareScreen() {
         entering={SlideInRight}
         exiting={SlideOutLeft}
       >
-        <View style={styles.header}>
+        <View style={headerStyle}>
           <BackButton onPress={() => {
             setSelectedService(null);
             setWebViewError(false);
@@ -78,16 +91,19 @@ export default function CareScreen() {
         ) : (
           <React.Fragment>
             {isBluebook ? (
-              Platform.OS === 'android' ? (
-                <WebViewContainer url={selectedService.url} />
-              ) : (
-                <BluebookWebView
-                  url={selectedService.url}
-                  email={userData?.email}
-                />
-              )
+              <BluebookWebView
+                url={selectedService.url}
+                email={userData?.email}
+              />
+            ) : isMultiplanProviderSearch ? (
+              <ProviderSearchWebView url={selectedService.url} />
             ) : (
-              <WebViewContainer url={selectedService.url} />
+              <WebViewContainer
+                url={selectedService.url}
+                highSecurity
+                openInBrowserHosts={OPEN_IN_BROWSER_HOSTS}
+                openInBrowserAutoOpen
+              />
             )}
           </React.Fragment>
         )}
@@ -98,7 +114,7 @@ export default function CareScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
         </Animated.View>
@@ -113,7 +129,7 @@ export default function CareScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
         </Animated.View>
@@ -133,34 +149,37 @@ export default function CareScreen() {
   if (services.length === 0) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
         </Animated.View>
-        <View style={styles.emptyContainer}>
-          <SmartText variant="body1" style={styles.emptyText}>No services available at this time</SmartText>
-        </View>
+        <EmptyState
+          icon={<Heart size={moderateScale(48)} color={colors.gray[300]} />}
+          message="No services available at this time"
+          actionLabel="Contact Concierge"
+          onAction={() => router.push('/chatWithConcierge' as never)}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
             <SmartText variant="body1" style={styles.description}>
-              Access telehealth, mental health, healthcare resources, and wellness tools all
-              in one convenient location.
+              Find PHCS Specific Services network providers, facilities and procedure costs, and schedule appointments online.
             </SmartText>
           </Animated.View>
 
@@ -168,33 +187,36 @@ export default function CareScreen() {
             {services.map((service, index) => {
               const ServiceIcon = service.icon;
               return (
-                <AnimatedTouchableOpacity
+                <Animated.View
                   key={service.id}
-                  style={styles.serviceCard}
-                  onPress={() => setSelectedService(service)}
-                  activeOpacity={0.9}
                   entering={FadeInUp.delay(300 + index * 100)}
                   layout={Layout.springify()}
-                  accessibilityLabel={`Open ${service.title}`}
-                  accessibilityRole="button"
                 >
-                  <View style={styles.serviceContent}>
-                    <View
-                      style={[styles.iconContainer, { backgroundColor: service.gradient }]}
-                    >
-                      <ServiceIcon size={moderateScale(26)} color={service.color} />
+                  <TouchableOpacity
+                    style={styles.serviceCard}
+                    onPress={() => setSelectedService(service)}
+                    activeOpacity={0.9}
+                    accessibilityLabel={`Open ${service.title}`}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.serviceContent}>
+                      <View
+                        style={[styles.iconContainer, { backgroundColor: service.gradient }]}
+                      >
+                        <ServiceIcon size={moderateScale(26)} color={service.color} />
+                      </View>
+                      <View style={styles.textContainer}>
+                        <SmartText variant="body1" style={styles.serviceTitle}>
+                          {service.title}
+                        </SmartText>
+                        <SmartText variant="body2" style={styles.serviceDescription}>
+                          {service.description}
+                        </SmartText>
+                      </View>
                     </View>
-                    <View style={styles.textContainer}>
-                      <SmartText variant="body1" style={styles.serviceTitle}>
-                        {service.title}
-                      </SmartText>
-                      <SmartText variant="body2" style={styles.serviceDescription}>
-                        {service.description}
-                      </SmartText>
-                    </View>
-                  </View>
-                  <ExternalLink size={moderateScale(18)} color={service.color} />
-                </AnimatedTouchableOpacity>
+                    <ExternalLink size={moderateScale(18)} color={service.color} />
+                  </TouchableOpacity>
+                </Animated.View>
               );
             })}
           </View>
@@ -213,14 +235,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '600',
@@ -337,14 +359,4 @@ const styles = StyleSheet.create({
     color: colors.background.default,
   },
 
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-  },
-  emptyText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
 });

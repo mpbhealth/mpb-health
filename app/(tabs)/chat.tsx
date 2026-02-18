@@ -21,6 +21,7 @@ import {
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { colors, borderRadius } from '@/constants/theme';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
@@ -33,7 +34,7 @@ const logoImg = require('../../assets/images/logo.png');
 
 export default function ChatScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom, insets } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
 
   const conciergeHours = [
@@ -102,11 +103,12 @@ export default function ChatScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
+        overScrollMode="never"
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Platform.OS === 'ios' ? insets.top + responsiveSize.lg : responsiveSize.xl,
-            paddingBottom: insets.bottom + responsiveSize.xl,
+            paddingTop: headerPaddingTop,
+            paddingBottom: scrollContentPaddingBottom,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -431,6 +433,7 @@ const styles = StyleSheet.create({
     color: colors.primary.main,
     fontWeight: '500',
     flex: 1,
+    minWidth: 0,
   },
   copyBtn: {
     padding: responsiveSize.xs,

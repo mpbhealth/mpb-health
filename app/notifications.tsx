@@ -11,8 +11,10 @@ import { Bell, AlertCircle, ChevronRight } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
+import { EmptyState } from '@/components/common/EmptyState';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 
 interface Notification {
@@ -27,6 +29,7 @@ interface Notification {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
 
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -78,22 +81,25 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
       >
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>Notifications</SmartText>
       </Animated.View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           {notifications.length === 0 ? (
-            <Animated.View entering={FadeInUp.delay(200)} style={styles.emptyState}>
-              <Bell size={moderateScale(56)} color={colors.gray[300]} />
-              <SmartText variant="h3" style={styles.emptyTitle}>No Notifications</SmartText>
-              <SmartText variant="body1" style={styles.emptyText}>You don't have any notifications at the moment.</SmartText>
+            <Animated.View entering={FadeInUp.delay(200)}>
+              <EmptyState
+                icon={<Bell size={moderateScale(48)} color={colors.gray[300]} />}
+                message="No Notifications"
+                subtitle="You don't have any notifications at the moment."
+              />
             </Animated.View>
           ) : (
             <View style={styles.list}>
@@ -152,14 +158,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
 
   title: {
     fontWeight: '700',
     color: colors.text.primary,
     marginLeft: responsiveSize.xs,
+    flex: 1,
+    minWidth: 0,
   },
 
   scrollContent: {
@@ -173,20 +180,6 @@ const styles = StyleSheet.create({
   },
   tabletMaxWidth: {
     maxWidth: 900,
-  },
-
-  emptyState: {
-    marginTop: responsiveSize.xl,
-    alignItems: 'center',
-    gap: responsiveSize.md,
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  emptyText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
   },
 
   list: {

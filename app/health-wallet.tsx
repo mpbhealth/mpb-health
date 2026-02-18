@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, SafeAreaView, Text, Alert, BackHandler } from 'react-native';
+import { View, StyleSheet, Platform, Text, Alert, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { Wallet } from 'lucide-react-native';
@@ -9,9 +9,12 @@ import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { platformStyles } from '@/utils/scaling';
 
 export default function HealthWalletScreen() {
   const router = useRouter();
+  const { headerPaddingTop } = useSafeHeaderPadding();
   const { userData, loading } = useUserData();
   const webViewRef = useRef<WebView>(null);
   const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
@@ -30,14 +33,37 @@ export default function HealthWalletScreen() {
     return <LoadingIndicator />;
   }
 
+  const isOnLandingOrSignIn = () => {
+    const url = (currentUrl || '').toLowerCase();
+    return (
+      url.includes('/landing') ||
+      url.includes('/login') ||
+      url.includes('/signin') ||
+      url.includes('/sign-in')
+    );
+  };
+
   const handleBackPress = () => {
-    // For all pages except landing/login, if WebView can go back, navigate back within WebView
-    if (webViewCanGoBack && webViewRef.current && !currentUrl.includes('/landing') && !currentUrl.includes('/login')) {
+    // On landing or sign-in page: back means exit HealthWallet → show exit confirmation
+    if (isOnLandingOrSignIn()) {
+      Alert.alert(
+        'Exit HealthWallet',
+        'Are you sure you want to exit HealthWallet?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Exit', style: 'destructive', onPress: () => router.back() }
+        ]
+      );
+      return;
+    }
+
+    // On any other page: if WebView can go back, navigate back within WebView
+    if (webViewCanGoBack && webViewRef.current) {
       webViewRef.current.goBack();
       return;
     }
 
-    // Show exit confirmation for landing/login pages or when WebView cannot go back
+    // Cannot go back within WebView → show exit confirmation
     Alert.alert(
       'Exit HealthWallet',
       'Are you sure you want to exit HealthWallet?',
@@ -54,31 +80,29 @@ export default function HealthWalletScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Animated.View 
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={handleBackPress} />
         <View style={styles.titleContainer}>
           <Wallet size={24} color={colors.primary.main} style={styles.titleIcon} />
-          <View style={styles.titleTextContainer}>
-            <Text style={styles.title}>HealthWallet</Text>
-            <Text style={styles.memberIdInTitle}>ID: {userData?.member_id}</Text>
-          </View>
+          <Text style={styles.title}>HealthWallet</Text>
         </View>
       </Animated.View>
 
       <View style={styles.webviewContainer}>
-        <WebViewContainer 
+        <WebViewContainer
           ref={webViewRef}
-          url="https://web.thehealthwallet.com/landing" 
+          url="https://web.thehealthwallet.com/landing"
           onNavigationStateChange={handleNavigationStateChange}
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          highSecurity
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -95,18 +119,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...Platform.select({
-      web: {
-        paddingTop: spacing.md,
-      },
-      ios: {
-        paddingTop: 0,
-      },
-      android: {
-        paddingTop: spacing.xl,
-      },
-    }),
-    ...shadows.sm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   titleContainer: {
     flexDirection: 'row',
@@ -117,17 +130,9 @@ const styles = StyleSheet.create({
   titleIcon: {
     marginRight: spacing.xs,
   },
-  titleTextContainer: {
-    flex: 1,
-  },
   title: {
     ...typography.h3,
     color: colors.text.primary,
-  },
-  memberIdInTitle: {
-    ...typography.caption,
-    color: colors.text.secondary,
-    marginTop: 2,
   },
   webviewContainer: {
     flex: 1,

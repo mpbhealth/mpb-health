@@ -16,9 +16,11 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { supabase } from '@/lib/supabase';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 export default function ActivateDependentAccountScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const {
     memberId,
     firstName,
@@ -150,7 +152,7 @@ export default function ActivateDependentAccountScreen() {
         throw new Error('Failed to create user profile');
       }
 
-      // Delete the member record from members table
+      // Remove member from members table so data exists only in users table
       const { error: deleteError } = await supabase
         .from('members')
         .delete()
@@ -158,7 +160,14 @@ export default function ActivateDependentAccountScreen() {
 
       if (deleteError) {
         console.error('Failed to delete member record:', deleteError);
-        // Don't throw here as the login was successfully created
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (_) {
+          // best-effort rollback; may not be available from client
+        }
+        throw new Error(
+          'We could not complete setup. The member record could not be moved. Please try again or contact support.'
+        );
       }
 
       // Show success message
@@ -187,7 +196,8 @@ export default function ActivateDependentAccountScreen() {
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -326,7 +336,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   content: {
     flex: 1,

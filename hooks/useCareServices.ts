@@ -7,8 +7,6 @@ import { colors } from '@/constants/theme';
 
 type CareServiceRow = Database['public']['Tables']['care_services']['Row'];
 
-const SECOND_OPINION_PRODUCT_IDS = ['43957', '44036'];
-
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
   const int = parseInt(clean, 16);
@@ -30,10 +28,19 @@ export type CareService = {
   displayOrder: number;
 };
 
-export function useCareServices(userProductId?: string | null) {
+/** Pass a single product id or an array (e.g. [normalized, raw] so both 47182 and 42464 match). */
+export function useCareServices(userProductId?: string | string[] | null) {
   const [services, setServices] = useState<CareService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const ids = Array.isArray(userProductId)
+    ? userProductId.map((id) => String(id).trim()).filter(Boolean)
+    : userProductId != null
+      ? [String(userProductId).trim()]
+      : [];
+
+  const idKey = ids.length ? ids.slice().sort().join(',') : '';
 
   useEffect(() => {
     fetchServices();
@@ -56,7 +63,7 @@ export function useCareServices(userProductId?: string | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userProductId]);
+  }, [idKey]);
 
   async function fetchServices() {
     try {
@@ -72,11 +79,15 @@ export function useCareServices(userProductId?: string | null) {
         throw fetchError;
       }
 
+      const userPids = ids.length > 0 ? ids : null;
+
       const filteredData = (data || []).filter((service: CareServiceRow) => {
-        if (service.service_key === 'second-md') {
-          return userProductId && SECOND_OPINION_PRODUCT_IDS.includes(userProductId);
+        const productIds = service.product_ids;
+        if (!productIds || productIds.length === 0) {
+          return true;
         }
-        return true;
+        if (!userPids) return false;
+        return productIds.some((id) => userPids.includes(String(id).trim()));
       });
 
       const mappedServices: CareService[] = filteredData.map((service: CareServiceRow, index: number) => {

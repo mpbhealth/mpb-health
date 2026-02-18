@@ -12,6 +12,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { Phone, Mail, User, Star, Copy } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
@@ -48,6 +49,7 @@ interface Advisor {
 export default function MyAdvisorScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
 
   const { userData, loading: userLoading } = useUserData();
@@ -138,7 +140,7 @@ export default function MyAdvisorScreen() {
   if (showFeedbackForm && advisor) {
     return (
       <View style={styles.container}>
-        <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+        <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => setShowFeedbackForm(false)} />
           <SmartText variant="h2" style={styles.screenTitle} maxLines={1}>Rate Your Advisor</SmartText>
         </Animated.View>
@@ -157,14 +159,15 @@ export default function MyAdvisorScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.screenTitle} maxLines={1}>My Advisor</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + responsiveSize.xl }]}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={styles.logoContainer} entering={FadeInDown.delay(200)}>
@@ -282,19 +285,20 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.background.default,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: responsiveSize.md,
     paddingHorizontal: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[100],
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   screenTitle: {
     color: colors.text.primary,
     marginLeft: responsiveSize.xs,
     fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
   },
   content: {
     flex: 1,

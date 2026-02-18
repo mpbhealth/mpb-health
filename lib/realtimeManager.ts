@@ -7,7 +7,7 @@ type SubscriptionCallback = () => void;
 class RealtimeManager {
   private channels: Map<string, RealtimeChannel> = new Map();
   private callbacks: Map<string, Set<SubscriptionCallback>> = new Map();
-  private connectionTimeout: NodeJS.Timeout | null = null;
+  private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   subscribe(
     channelName: string,
@@ -52,7 +52,7 @@ class RealtimeManager {
             }
           }
         )
-        .subscribe((status) => {
+        .subscribe((status: 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT') => {
           if (status === 'SUBSCRIBED') {
             logger.debug('Realtime channel subscribed', { key, table });
           } else if (status === 'CHANNEL_ERROR') {

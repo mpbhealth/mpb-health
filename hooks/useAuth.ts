@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Session, AuthError } from '@supabase/supabase-js';
+import { Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { logger } from '@/lib/logger';
 
@@ -39,7 +39,7 @@ export function useAuth() {
     getInitialSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       logger.logAuthEvent(`State change: ${event}`, session?.user?.id, { hasSession: !!session });
       setSession(session);
       
@@ -191,19 +191,26 @@ export function useAuth() {
         }
       }
       
-      // Final verification - check if record still exists
+      // Final verification - ensure record is no longer in members table
       const { data: remainingMember, error: checkError } = await supabase
         .from('members')
         .select('member_id')
         .eq('member_id', memberData.member_id.trim())
         .maybeSingle();
-      
-      if (!checkError && remainingMember) {
-        logger.error('Critical: Member record still exists after deletion', undefined, { memberId: memberData.member_id });
-        // Log this for manual cleanup but don't fail the user creation
-      } else {
-        logger.info('Member record successfully deleted', { memberId: memberData.member_id });
+
+      if (!deleteSuccess || (!checkError && remainingMember)) {
+        logger.error('Member record still exists after deletion', undefined, { memberId: memberData.member_id });
+        // Rollback: remove auth user so member can retry signup (data stays in members until next attempt)
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (rollbackErr) {
+          logger.error('Rollback deleteUser failed', rollbackErr);
+        }
+        throw new Error(
+          'Your account was created but we could not complete the final step. Please try again or contact support.'
+        );
       }
+      logger.info('Member record successfully deleted; data now only in users table', { memberId: memberData.member_id });
     } catch (error) {
       throw error;
     }

@@ -17,11 +17,13 @@ import { Eye, EyeOff, AlertCircle, Check } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const logoImg = require('../../assets/images/logo.png');
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -215,7 +217,8 @@ export default function ResetPasswordScreen() {
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
+        contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -356,7 +359,7 @@ export default function ResetPasswordScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background.default },
-  scrollContent: { flexGrow: 1, padding: spacing.lg, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
+  scrollContent: { flexGrow: 1, padding: spacing.lg },
   content: { flex: 1, width: '100%', maxWidth: 400, alignSelf: 'center' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },

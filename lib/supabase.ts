@@ -43,9 +43,6 @@ try {
     throw new Error(`Invalid supabaseUrl: ${String(err?.message ?? err)}`);
   }
 
-  console.log('Supabase URL:', supabaseUrlCandidate);
-  console.log('Supabase Key exists:', !!supabaseAnonKeyCandidate);
-
   supabase = createClient(String(supabaseUrlCandidate), String(supabaseAnonKeyCandidate), {
     auth: {
       storage: AsyncStorage,
@@ -53,9 +50,9 @@ try {
       persistSession: true,
       detectSessionInUrl: Platform.OS === 'web',
       flowType: 'pkce',
+      debug: false, // set to __DEV__ only when debugging auth; avoids GoTrueClient log spam and token exposure
       ...(Platform.OS === 'ios' && {
         storageKey: 'mpb-health-auth',
-        debug: __DEV__,
       }),
     },
     global: {

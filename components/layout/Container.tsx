@@ -32,10 +32,10 @@ export const Container: React.FC<ContainerProps> = ({
       style={[
         {
           flex: 1,
-          paddingTop: safeArea ? insets.top : 0,
-          paddingBottom: safeArea ? insets.bottom : 0,
-          paddingLeft: paddingMap[padding],
-          paddingRight: paddingMap[padding],
+          paddingTop: safeArea ? Math.max(insets.top, paddingMap[padding]) : 0,
+          paddingBottom: safeArea ? Math.max(insets.bottom, paddingMap[padding]) : 0,
+          paddingLeft: safeArea ? Math.max(insets.left, paddingMap[padding]) : paddingMap[padding],
+          paddingRight: safeArea ? Math.max(insets.right, paddingMap[padding]) : paddingMap[padding],
           maxWidth: maxWidth || undefined,
           alignSelf: 'center',
           width: '100%',

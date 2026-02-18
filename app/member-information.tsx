@@ -1,16 +1,15 @@
-import { View, StyleSheet, Platform, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, ExternalLink, Shield, AlertCircle } from 'lucide-react-native';
+import { User } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
-import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
-import { useState } from 'react';
 import { useUserData } from '@/hooks/useUserData';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
 
 function rgbaFromHex(hex: string, alpha: number) {
@@ -22,34 +21,33 @@ function rgbaFromHex(hex: string, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function formatDob(dob: string | null | undefined): string {
+  if (!dob) return '—';
+  const s = String(dob).trim();
+  if (s.includes('-')) {
+    const [y, m, d] = s.split('-');
+    if (y && m && d) return `${m}/${d}/${y}`;
+  }
+  if (s.length === 8) {
+    return `${s.slice(4, 6)}/${s.slice(6, 8)}/${s.slice(0, 4)}`;
+  }
+  return s;
+}
+
 export default function PersonalInformationScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
   const { userData, loading } = useUserData();
-  const [showPortal, setShowPortal] = useState(false);
 
   if (loading) {
     return <LoadingIndicator />;
   }
 
-  if (showPortal) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <BackButton onPress={() => setShowPortal(false)} />
-          <View style={styles.headerContent}>
-            <SmartText variant="h3" style={styles.headerTitle}>Member Portal</SmartText>
-          </View>
-        </View>
-        <WebViewContainer url="https://www.1enrollment.com/index.cfm?id=364279" />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <Animated.View
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
@@ -58,8 +56,9 @@ export default function PersonalInformationScreen() {
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -84,51 +83,15 @@ export default function PersonalInformationScreen() {
                   <SmartText variant="body1" style={styles.value}>{userData?.member_id}</SmartText>
                 </View>
 
+                <View style={styles.infoRow}>
+                  <SmartText variant="body2" style={styles.label}>Date of Birth</SmartText>
+                  <SmartText variant="body1" style={styles.value}>{formatDob(userData?.dob)}</SmartText>
+                </View>
+
                 <View style={styles.infoRowLast}>
                   <SmartText variant="body2" style={styles.label}>Email</SmartText>
                   <SmartText variant="body1" style={styles.value}>{userData?.email}</SmartText>
                 </View>
-              </View>
-            </Card>
-          </Animated.View>
-
-          <Animated.View entering={FadeInUp.delay(300)}>
-            <Card padding="md" variant="outlined" style={styles.securityCard}>
-              <Shield size={moderateScale(22)} color={colors.status.info} style={{ marginRight: responsiveSize.sm }} />
-              <View style={styles.securityContent}>
-                <SmartText variant="body1" style={styles.securityTitle}>Secure Access</SmartText>
-                <SmartText variant="body2" style={styles.securityText}>
-                  For detailed personal information and account management, access our secure member portal.
-                </SmartText>
-              </View>
-            </Card>
-          </Animated.View>
-
-          <Animated.View entering={FadeInUp.delay(400)}>
-            <Card padding="lg" style={styles.actionCard}>
-              <TouchableOpacity
-                style={styles.portalButton}
-                onPress={() => setShowPortal(true)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.portalButtonContent}>
-                  <View style={styles.portalIconContainer}>
-                    <ExternalLink size={moderateScale(22)} color={colors.background.default} />
-                  </View>
-                  <View style={styles.portalTextContainer}>
-                    <SmartText variant="body1" style={styles.portalButtonText}>Access Member Portal</SmartText>
-                    <SmartText variant="body2" style={styles.portalButtonSubtext}>
-                      View complete personal information
-                    </SmartText>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.noteContainer}>
-                <AlertCircle size={moderateScale(14)} color={colors.text.secondary} />
-                <SmartText variant="caption" style={styles.noteText}>
-                  You'll need your portal credentials to access detailed information
-                </SmartText>
               </View>
             </Card>
           </Animated.View>
@@ -146,23 +109,16 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
     fontWeight: '700',
     color: colors.text.primary,
     marginLeft: responsiveSize.xs,
+    flex: 1,
+    minWidth: 0,
   },
   content: {
     flex: 1,
@@ -220,74 +176,5 @@ const styles = StyleSheet.create({
   value: {
     fontWeight: '600',
     color: colors.text.primary,
-  },
-
-  securityCard: {
-    backgroundColor: rgbaFromHex(colors.status.info, 0.08),
-    borderColor: rgbaFromHex(colors.status.info, 0.2),
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: responsiveSize.lg,
-  },
-  securityContent: {
-    flex: 1,
-    minWidth: 0,
-    gap: responsiveSize.xs / 2,
-  },
-  securityTitle: {
-    fontWeight: '600',
-    color: colors.status.info,
-  },
-  securityText: {
-    color: colors.status.info,
-  },
-
-  actionCard: {
-    gap: responsiveSize.md,
-  },
-  portalButton: {
-    backgroundColor: colors.primary.main,
-    borderRadius: borderRadius.lg,
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
-  },
-  portalButtonContent: {
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: responsiveSize.sm,
-    minHeight: MIN_TOUCH_TARGET,
-  },
-  portalIconContainer: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: borderRadius.md,
-    backgroundColor: rgbaFromHex(colors.background.default, 0.2),
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  portalTextContainer: {
-    flex: 1,
-    minWidth: 0,
-    gap: responsiveSize.xs / 4,
-  },
-  portalButtonText: {
-    fontWeight: '600',
-    color: colors.background.default,
-  },
-  portalButtonSubtext: {
-    color: colors.background.default,
-    opacity: 0.9,
-  },
-  noteContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: responsiveSize.xs / 2,
-    paddingHorizontal: responsiveSize.xs,
-  },
-  noteText: {
-    flex: 1,
-    color: colors.text.secondary,
   },
 });

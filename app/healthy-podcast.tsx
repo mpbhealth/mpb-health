@@ -19,14 +19,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Card } from '@/components/common/Card';
 import { supabase } from '@/lib/supabase';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface Video {
   video_url: string;
@@ -71,15 +71,14 @@ function VideoCard({ video, index, onPress }: { video: Video, index: number, onP
   };
 
   return (
-    <AnimatedTouchableOpacity
-      style={[styles.videoCard, animatedStyle]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      entering={FadeInUp.delay(300 + index * 100)}
-      layout={Layout.springify()}
-      activeOpacity={1}
-    >
+    <Animated.View entering={FadeInUp.delay(300 + index * 100)} layout={Layout.springify()}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        <Animated.View style={[styles.videoCard, animatedStyle]}>
       <View style={styles.videoContent}>
         <View style={styles.videoIconContainer}>
           <Play size={moderateScale(24)} color={colors.primary.main} />
@@ -118,13 +117,16 @@ function VideoCard({ video, index, onPress }: { video: Video, index: number, onP
           <ExternalLink size={moderateScale(18)} color={colors.primary.main} />
         </View>
       </View>
-    </AnimatedTouchableOpacity>
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 export default function HealthyPodcastScreen() {
   const router = useRouter();
   const { isTablet } = useResponsive();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
 
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,7 +169,7 @@ export default function HealthyPodcastScreen() {
     <View style={styles.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
       >
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
@@ -177,8 +179,9 @@ export default function HealthyPodcastScreen() {
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -207,15 +210,12 @@ export default function HealthyPodcastScreen() {
           )}
 
           {videos.length === 0 && !error && !loading && (
-            <Animated.View
-              style={styles.emptyState}
-              entering={FadeInUp.delay(300)}
-            >
-              <Play size={moderateScale(48)} color={colors.gray[300]} />
-              <SmartText variant="h3" style={styles.emptyTitle}>No Videos Available</SmartText>
-              <SmartText variant="body1" style={styles.emptyText}>
-                Check back soon for new health and wellness content.
-              </SmartText>
+            <Animated.View entering={FadeInUp.delay(300)}>
+              <EmptyState
+                icon={<Play size={moderateScale(48)} color={colors.gray[300]} />}
+                message="No Videos Available"
+                subtitle="Check back soon for new health and wellness content."
+              />
             </Animated.View>
           )}
         </View>
@@ -233,14 +233,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.md,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     flexDirection: 'row',
     alignItems: 'center',
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
     marginLeft: responsiveSize.xs,
+    minWidth: 0,
   },
   headerTitle: {
     fontWeight: '700',
@@ -344,18 +344,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  emptyText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-    maxWidth: moderateScale(300),
-  },
 });

@@ -102,7 +102,7 @@ export function useDiscountServices() {
         throw codesError;
       }
 
-      const codesByServiceId = (codesData || []).reduce((acc, code: DiscountCodeRow) => {
+      const codesByServiceId = (codesData || []).reduce((acc: Record<string, DiscountCode[]>, code: DiscountCodeRow) => {
         if (!acc[code.service_id]) {
           acc[code.service_id] = [];
         }

@@ -55,6 +55,7 @@ export const responsiveSize = {
   xxl: moderateScale(48),
 };
 
+/** Shadows: iOS only. On Android we use no elevation to avoid visible shadow around cards/buttons/icons. */
 export const platformStyles = {
   shadow: Platform.select({
     ios: {
@@ -63,9 +64,7 @@ export const platformStyles = {
       shadowOpacity: 0.1,
       shadowRadius: 8,
     },
-    android: {
-      elevation: 3,
-    },
+    android: {},
     default: {},
   }),
 
@@ -76,9 +75,7 @@ export const platformStyles = {
       shadowOpacity: 0.08,
       shadowRadius: 3,
     },
-    android: {
-      elevation: 1,
-    },
+    android: {},
     default: {},
   }),
 
@@ -89,9 +86,7 @@ export const platformStyles = {
       shadowOpacity: 0.12,
       shadowRadius: 8,
     },
-    android: {
-      elevation: 4,
-    },
+    android: {},
     default: {},
   }),
 
@@ -102,9 +97,7 @@ export const platformStyles = {
       shadowOpacity: 0.15,
       shadowRadius: 12,
     },
-    android: {
-      elevation: 6,
-    },
+    android: {},
     default: {},
   }),
 

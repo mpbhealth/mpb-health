@@ -12,13 +12,13 @@ import { Users, ChevronRight, User, CheckCircle } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
+import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/lib/supabase';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 interface InactiveDependent {
   member_id: string;
@@ -49,6 +49,7 @@ interface ActiveDependent {
 
 export default function ActivateDependentsScreen() {
   const router = useRouter();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { userData, loading: userLoading } = useUserData();
   const [inactiveDependents, setInactiveDependents] = useState<InactiveDependent[]>([]);
   const [activeDependents, setActiveDependents] = useState<ActiveDependent[]>([]);
@@ -162,15 +163,16 @@ export default function ActivateDependentsScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={styles.header} entering={FadeInDown.delay(100)}>
+      <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title} maxLines={1}>Create App Login</SmartText>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
+        overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
         <Animated.View style={styles.introCard} entering={FadeInUp.delay(200)}>
           <Users size={moderateScale(24)} color={colors.primary.main} />
@@ -187,47 +189,50 @@ export default function ActivateDependentsScreen() {
             <SmartText variant="body1" style={styles.errorText} maxLines={2}>{error}</SmartText>
           </Animated.View>
         ) : totalDependents === 0 ? (
-          <Animated.View style={styles.emptyCard} entering={FadeInUp.delay(300)}>
-            <Users size={moderateScale(48)} color={colors.gray[300]} />
-            <SmartText variant="h3" style={styles.emptyTitle} maxLines={1}>No Dependents Found</SmartText>
-            <SmartText variant="body1" style={styles.emptyText} maxLines={2}>
-              You don't have any dependents that need app login setup.
-            </SmartText>
+          <Animated.View entering={FadeInUp.delay(300)}>
+            <EmptyState
+              icon={<Users size={moderateScale(48)} color={colors.gray[300]} />}
+              message="No Dependents Found"
+              subtitle="You don't have any dependents that need app login setup."
+            />
           </Animated.View>
         ) : (
           <View style={styles.dependentsGrid}>
             {/* Active Dependents */}
             {activeDependents.map((dependent, index) => (
-              <AnimatedTouchableOpacity
+              <Animated.View
                 key={`active-${dependent.id}`}
-                style={[styles.dependentCard, styles.activeDependentCard]}
-                onPress={() => {
-                  Alert.alert(
-                    'Login Already Created',
-                    `${dependent.first_name} ${dependent.last_name} already has an app login and can sign in using their credentials.`,
-                    [{ text: 'OK', style: 'default' }]
-                  );
-                }}
                 entering={FadeInUp.delay(300 + index * 100)}
                 layout={Layout.springify()}
               >
-                <View style={styles.dependentContent}>
-                  <View style={[styles.dependentIconContainer, { backgroundColor: `${colors.status.success}15` }]}>
-                    <CheckCircle size={moderateScale(24)} color={colors.status.success} />
+                <TouchableOpacity
+                  style={[styles.dependentCard, styles.activeDependentCard]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Login Already Created',
+                      `${dependent.first_name} ${dependent.last_name} already has an app login and can sign in using their credentials.`,
+                      [{ text: 'OK', style: 'default' }]
+                    );
+                  }}
+                >
+                  <View style={styles.dependentContent}>
+                    <View style={[styles.dependentIconContainer, { backgroundColor: `${colors.status.success}15` }]}>
+                      <CheckCircle size={moderateScale(24)} color={colors.status.success} />
+                    </View>
+                    <View style={styles.dependentInfo}>
+                      <SmartText variant="h4" style={styles.dependentName} maxLines={1}>
+                        {dependent.first_name} {dependent.last_name}
+                      </SmartText>
+                      <SmartText variant="body2" style={styles.dependentRelationship} maxLines={1}>
+                        {dependent.relationship} • Login Created
+                      </SmartText>
+                      <SmartText variant="caption" style={styles.activatedText} maxLines={1}>
+                        Can sign in with: {dependent.email}
+                      </SmartText>
+                    </View>
                   </View>
-                  <View style={styles.dependentInfo}>
-                    <SmartText variant="h4" style={styles.dependentName} maxLines={1}>
-                      {dependent.first_name} {dependent.last_name}
-                    </SmartText>
-                    <SmartText variant="body2" style={styles.dependentRelationship} maxLines={1}>
-                      {dependent.relationship} • Login Created
-                    </SmartText>
-                    <SmartText variant="caption" style={styles.activatedText} maxLines={1}>
-                      Can sign in with: {dependent.email}
-                    </SmartText>
-                  </View>
-                </View>
-              </AnimatedTouchableOpacity>
+                </TouchableOpacity>
+              </Animated.View>
             ))}
 
             {/* Inactive Dependents */}
@@ -236,17 +241,19 @@ export default function ActivateDependentsScreen() {
               const age = dependent.relationship.toLowerCase() === 'child' ? calculateAge(dependent.dob) : null;
 
               return (
-                <AnimatedTouchableOpacity
+                <Animated.View
                   key={`inactive-${dependent.member_id}`}
-                  style={[
-                    styles.dependentCard,
-                    !canActivate && styles.dependentCardDisabled,
-                  ]}
-                  onPress={() => handleDependentPress(dependent)}
-                  disabled={!canActivate}
                   entering={FadeInUp.delay(300 + (activeDependents.length + index) * 100)}
                   layout={Layout.springify()}
                 >
+                  <TouchableOpacity
+                    style={[
+                      styles.dependentCard,
+                      !canActivate && styles.dependentCardDisabled,
+                    ]}
+                    onPress={() => handleDependentPress(dependent)}
+                    disabled={!canActivate}
+                  >
                   <View style={styles.dependentContent}>
                     <View style={[
                       styles.dependentIconContainer,
@@ -286,7 +293,8 @@ export default function ActivateDependentsScreen() {
                   {canActivate && (
                     <ChevronRight size={moderateScale(20)} color={colors.gray[400]} />
                   )}
-                </AnimatedTouchableOpacity>
+                </TouchableOpacity>
+              </Animated.View>
               );
             })}
           </View>
@@ -304,11 +312,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background.default,
     padding: responsiveSize.lg,
-    paddingTop: Platform.OS === 'ios' ? moderateScale(60) : moderateScale(40),
     flexDirection: 'row',
     alignItems: 'center',
     gap: responsiveSize.sm,
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
     color: colors.text.primary,
@@ -351,21 +358,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.status.error,
-    textAlign: 'center',
-  },
-  emptyCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: responsiveSize.xxl,
-    alignItems: 'center',
-    gap: responsiveSize.md,
-    ...platformStyles.shadowMd,
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-  },
-  emptyText: {
-    color: colors.text.secondary,
     textAlign: 'center',
   },
   dependentsGrid: {

@@ -12,8 +12,16 @@ if (typeof globalThis.structuredClone === 'undefined') {
 }
 
 import React, { useEffect } from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, LogBox, useWindowDimensions } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
+
+// Suppress known warnings so the console stays quiet during development
+LogBox.ignoreLogs([
+  '[expo-av]: Expo AV has been deprecated',
+  'may be overwritten by a layout animation',
+  'missing the required default export', // expo-router sometimes flags _layout during HMR
+  'ViewPropTypes',
+]);
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,11 +32,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { useScreenOrientationLock } from '@/hooks/useScreenOrientationLock';
 
 export default function RootLayout() {
   const { session, loading, signOut } = useAuth();
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   useFrameworkReady();
+  useScreenOrientationLock(screenWidth);
 
   // Deep-linking handler
   useEffect(() => {
@@ -108,23 +120,43 @@ export default function RootLayout() {
     }
   }, [loading, session, signOut, router]);
 
+  if (loading) {
+    return (
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            <LoadingIndicator message="Loading…" />
+            <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
+          </View>
+        </SafeAreaProvider>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <View style={{ flex: 1, backgroundColor: '#fff' }}>
-            <Stack screenOptions={{ headerShown: false }}>
-              {/* MAIN TABS (swipe-back disabled) */}
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                gestureEnabled: true,
+              }}
+            >
               <Stack.Screen
                 name="(tabs)"
                 options={{
                   headerShown: false,
                   gestureEnabled: false,
+                  animation: 'none',
                 }}
               />
 
-              {/* AUTH FLOW */}
-              <Stack.Screen name="auth" options={{ headerShown: false }} />
+              <Stack.Screen name="payment-history" options={{ headerShown: false }} />
+
+              <Stack.Screen name="auth" options={{ headerShown: false, animation: 'fade' }} />
               <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
               <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
             </Stack>

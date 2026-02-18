@@ -2,9 +2,11 @@ import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking } from 'rea
 import { useRouter } from 'expo-router';
 import { Phone, MessageSquare, ArrowLeft } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 export default function MemberSupportScreen() {
   const router = useRouter();
+  const { headerPaddingTop } = useSafeHeaderPadding();
 
   const handleCall = () => {
     Linking.openURL('tel:+18558164650');
@@ -17,7 +19,7 @@ export default function MemberSupportScreen() {
   return (
     <View style={styles.container}>
       <Animated.View 
-        style={styles.header}
+        style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
       >
         <TouchableOpacity 
@@ -86,7 +88,6 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   backButton: {
     width: 40,
@@ -142,11 +143,14 @@ const styles = StyleSheet.create({
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 3,
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 3,
+        }
+      : {}),
   },
   iconContainer: {
     width: 48,

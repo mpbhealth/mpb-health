@@ -1,9 +1,6 @@
 import React from 'react';
-import {
-  View,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { SmartText } from '@/components/common/SmartText';
 import { colors } from '@/constants/theme';
 import { responsiveSize } from '@/utils/scaling';
@@ -14,7 +11,8 @@ interface LoadingIndicatorProps {
 
 export function LoadingIndicator({ message = 'Loading...' }: LoadingIndicatorProps) {
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(220)}
       style={styles.container}
       accessibilityRole="progressbar"
       accessibilityLabel={message}
@@ -24,8 +22,10 @@ export function LoadingIndicator({ message = 'Loading...' }: LoadingIndicatorPro
         color={colors.primary.main}
         style={styles.spinner}
       />
-      <SmartText variant="body1" style={styles.text} maxLines={1}>{message}</SmartText>
-    </View>
+      <SmartText variant="body1" style={styles.text} maxLines={1}>
+        {message}
+      </SmartText>
+    </Animated.View>
   );
 }
 

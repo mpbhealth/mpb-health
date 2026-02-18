@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
 
   // Immediately send users into the verification flow
   useEffect(() => {
@@ -29,16 +29,14 @@ export default function SignUpScreen() {
   // Fallback UI while redirecting (in case of slow devices/network)
   return (
     <KeyboardAvoidingView
-      style={[
-        styles.container,
-        { paddingTop: Platform.OS === 'ios' ? insets.top : spacing.lg },
-      ]}
+      style={[styles.container, { paddingTop: headerPaddingTop }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        overScrollMode="never"
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.lg },
+          { paddingBottom: scrollContentPaddingBottom + spacing.lg },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
