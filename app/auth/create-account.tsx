@@ -245,8 +245,8 @@ export default function CreateAccountScreen() {
         throw new Error('Account created, but we could not complete cleanup. Please try again or contact support.');
       }
 
-      // Success → go to sign-in
-      router.replace('/auth/sign-in');
+      // signUp already created a session — go straight to home
+      router.replace('/(tabs)');
     } catch (err: any) {
       console.error('CreateAccount error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');

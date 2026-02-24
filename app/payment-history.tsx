@@ -38,7 +38,7 @@ export default function PaymentHistoryScreen() {
       'Are you sure you want to exit?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Exit', style: 'destructive', onPress: () => router.back() },
+        { text: 'Exit', style: 'destructive', onPress: () => router.replace('/(tabs)/profile' as never) },
       ]
     );
   }, [webViewCanGoBack, router]);

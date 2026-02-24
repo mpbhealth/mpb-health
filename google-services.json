@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "159065131703",
+    "project_id": "mpb-health-notifications",
+    "storage_bucket": "mpb-health-notifications.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:159065131703:android:f7b3bc290e62c907b39b32",
+        "android_client_info": {
+          "package_name": "com.mpb.health"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEud9CIO5GJ8kuCpt6fiGk5h-kjMzKz3g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

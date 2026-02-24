@@ -429,6 +429,87 @@ export interface Database {
           created_at?: string | null
         }
       }
+      notifications: {
+        Row: {
+          id: string
+          title: string
+          body: string
+          target_type: 'all' | 'user'
+          target_user_id: string | null
+          route: string | null
+          type: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          body: string
+          target_type: 'all' | 'user'
+          target_user_id?: string | null
+          route?: string | null
+          type?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          body?: string
+          target_type?: 'all' | 'user'
+          target_user_id?: string | null
+          route?: string | null
+          type?: string | null
+          created_at?: string
+        }
+      }
+      notification_reads: {
+        Row: {
+          id: string
+          notification_id: string
+          user_id: string
+          read_at: string
+        }
+        Insert: {
+          id?: string
+          notification_id: string
+          user_id: string
+          read_at?: string
+        }
+        Update: {
+          id?: string
+          notification_id?: string
+          user_id?: string
+          read_at?: string
+        }
+      }
+      push_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          expo_push_token: string
+          device_id: string | null
+          platform: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          expo_push_token: string
+          device_id?: string | null
+          platform?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          expo_push_token?: string
+          device_id?: string | null
+          platform?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

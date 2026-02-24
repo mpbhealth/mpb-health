@@ -43,6 +43,8 @@ import { colors, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useFocusEffect } from 'expo-router';
 
 const logoImg = require('../../assets/images/logo.png');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -174,7 +176,14 @@ export default function HomeScreen() {
   const router = useRouter();
   const { userData, loading } = useUserData();
   const [refreshing, setRefreshing] = useState(false);
-  const [hasUnreadNotifications] = useState(true);
+  const { unreadCount, refetch } = useNotifications();
+  const hasUnreadNotifications = unreadCount > 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
   const [showTelehealthDisclaimer, setShowTelehealthDisclaimer] = useState(false);
   const [showPendingActivationModal, setShowPendingActivationModal] = useState(false);
   const insets = useSafeAreaInsets();

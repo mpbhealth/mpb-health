@@ -82,6 +82,7 @@ export default ({ config }) => ({
     },
     android: {
       package: 'com.mpb.health',
+      googleServicesFile: './google-services.json',
       versionCode: 130,
       targetSdkVersion: 35,
       proguardFiles: ['./proguard-rules.pro'],
@@ -149,6 +150,15 @@ export default ({ config }) => ({
           android: {
             enforceNavigationBarContrast: false,
           },
+        },
+      ],
+      [
+        'expo-notifications',
+        {
+          icon: './assets/images/notification-icon.png',
+          color: '#0071BC',
+          sounds: [],
+          mode: 'production',
         },
       ],
     ],
