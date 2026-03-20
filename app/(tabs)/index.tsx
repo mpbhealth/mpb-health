@@ -94,18 +94,17 @@ function AnimatedServiceCard({
   };
 
   return (
-    <AnimatedTouchable
-      style={[styles.serviceCard, animatedStyle]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      entering={FadeInUp.delay(300 + index * 100)}
-      layout={Layout.springify()}
-      activeOpacity={0.85}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${service.title}`}
-    >
-      <View style={styles.serviceCardContent}>
+    <Animated.View entering={FadeInUp.delay(300 + index * 100)} layout={Layout.springify()}>
+      <AnimatedTouchable
+        style={[styles.serviceCard, animatedStyle]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${service.title}`}
+      >
+        <View style={styles.serviceCardContent}>
         <View style={[styles.serviceIconContainer, { backgroundColor: service.gradient }]}>
           <service.icon size={moderateScale(24)} color={service.color} />
         </View>
@@ -121,7 +120,8 @@ function AnimatedServiceCard({
       <View style={[styles.chevronContainer, { backgroundColor: service.gradient }]}>
         <ChevronRight size={moderateScale(18)} color={service.color} />
       </View>
-    </AnimatedTouchable>
+      </AnimatedTouchable>
+    </Animated.View>
   );
 }
 

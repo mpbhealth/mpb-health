@@ -82,6 +82,22 @@ const formatDateToYYYYMMDD = (date: Date): string => {
 };
 const safeLower = (s: string) => String(s ?? '').trim().toLowerCase();
 
+const calculateAge = (dob: string | null): number | null => {
+  if (!dob) return null;
+  const today = new Date();
+  const birthDate = new Date(formatDateForStorage(dob));
+  if (isNaN(birthDate.getTime())) return null;
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const AGE_MIN = 18;
+const UNDER_AGE_MESSAGE = 'You have to be 18 or older to use the app.';
+
 // ---------- screen ----------
 export default function VerifyMembershipScreen() {
   const router = useRouter();
@@ -264,7 +280,16 @@ export default function VerifyMembershipScreen() {
           return;
         }
 
-        // 3) Dependent with missing email → collect
+        // 3) Check age for dependents (must be 18+) — before any email flow
+        if (member.is_primary === false) {
+          const age = calculateAge(member.dob);
+          if (age !== null && age < AGE_MIN) {
+            setError(UNDER_AGE_MESSAGE);
+            return;
+          }
+        }
+
+        // 4) Dependent with missing email → collect
         const hasEmail =
           !!member.email &&
           String(member.email).trim() !== '' &&
@@ -276,7 +301,7 @@ export default function VerifyMembershipScreen() {
           return;
         }
 
-        // 4) Check if dependent email matches primary email (check both members and users tables)
+        // 5) Check if dependent email matches primary email (check both members and users tables)
         if (member.is_primary === false && hasEmail && member.primary_id) {
           console.log('[DEBUG] Checking dependent email against primary...', {
             dependentEmail: member.email,
@@ -321,7 +346,7 @@ export default function VerifyMembershipScreen() {
           }
         }
 
-        // 5) Check if email is already taken by ANY user (not just primary)
+        // 6) Check if email is already taken by ANY user (not just primary)
         if (hasEmail) {
           const { data: emailTaken, error: emailErr } = await supabase
             .from('users')
@@ -336,7 +361,7 @@ export default function VerifyMembershipScreen() {
             return;
           }
 
-          // 6) Check if email exists in Supabase Auth
+          // 7) Check if email exists in Supabase Auth
           const checkAuthUrl = `${supabase.supabaseUrl}/functions/v1/check-email-exists`;
           const authCheckRes = await fetch(checkAuthUrl, {
             method: 'POST',
@@ -360,7 +385,7 @@ export default function VerifyMembershipScreen() {
           }
         }
 
-        // 7) Good → go create
+        // 8) Good → go create
         pushToCreate({ ...member, email: safeLower(member.email ?? '') });
       } else {
         // email + dob path
@@ -458,6 +483,15 @@ export default function VerifyMembershipScreen() {
           setShowEmailInput(true);
           setNotice('This email is already registered. Please enter a different email for your login.');
           return;
+        }
+
+        // 6) Check age for dependents (must be 18+)
+        if (member.is_primary === false) {
+          const age = calculateAge(member.dob);
+          if (age !== null && age < AGE_MIN) {
+            setError(UNDER_AGE_MESSAGE);
+            return;
+          }
         }
 
         pushToCreate({ ...member, email: safeLower(member.email ?? emailLower) });
@@ -558,6 +592,13 @@ export default function VerifyMembershipScreen() {
         .update({ email: dependentEmailLower })
         .eq('member_id', dependentMember.member_id);
       if (updateError) throw updateError;
+
+      // Check age for dependents (must be 18+)
+      const age = calculateAge(dependentMember.dob);
+      if (age !== null && age < AGE_MIN) {
+        setError(UNDER_AGE_MESSAGE);
+        return;
+      }
 
       const updated = { ...dependentMember, email: dependentEmailLower } as MemberRow;
       pushToCreate(updated);

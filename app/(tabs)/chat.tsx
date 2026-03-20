@@ -28,8 +28,6 @@ import { Card } from '@/components/common/Card';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
 const logoImg = require('../../assets/images/logo.png');
 
 export default function ChatScreen() {
@@ -178,13 +176,12 @@ export default function ChatScreen() {
           <View style={styles.divider} />
 
           <Animated.View entering={FadeInUp.delay(400)} style={[styles.actions, isTablet && styles.actionsWide]}>
-            <AnimatedTouchable
-              entering={FadeInUp.delay(500)}
-              layout={Layout.springify()}
-              style={[styles.actionButton, styles.chatBtn, isTablet && styles.flexOne]}
-              onPress={goChat}
-              activeOpacity={0.85}
-            >
+            <Animated.View entering={FadeInUp.delay(500)} layout={Layout.springify()}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.chatBtn, isTablet && styles.flexOne]}
+                onPress={goChat}
+                activeOpacity={0.85}
+              >
               <View style={styles.actionInner}>
                 <MessageSquare size={moderateScale(24)} color="#fff" />
                 <SmartText variant="h4" style={styles.chatText}>
@@ -192,14 +189,14 @@ export default function ChatScreen() {
                 </SmartText>
                 <ArrowRight size={moderateScale(20)} color="#fff" />
               </View>
-            </AnimatedTouchable>
+              </TouchableOpacity>
+            </Animated.View>
 
-            <AnimatedTouchable
-              entering={FadeInUp.delay(600)}
-              layout={Layout.springify()}
-              style={[styles.actionButton, isTablet && styles.flexOne]}
-              onPress={handleCall}
-            >
+            <Animated.View entering={FadeInUp.delay(600)} layout={Layout.springify()}>
+              <TouchableOpacity
+                style={[styles.actionButton, isTablet && styles.flexOne]}
+                onPress={handleCall}
+              >
               <View style={styles.iconBox}>
                 <Phone size={moderateScale(20)} color={colors.primary.main} />
               </View>
@@ -218,14 +215,14 @@ export default function ChatScreen() {
                   )}
                 </View>
               </View>
-            </AnimatedTouchable>
+              </TouchableOpacity>
+            </Animated.View>
 
-            <AnimatedTouchable
-              entering={FadeInUp.delay(700)}
-              layout={Layout.springify()}
-              style={[styles.actionButton, isTablet && styles.flexOne]}
-              onPress={handleEmail}
-            >
+            <Animated.View entering={FadeInUp.delay(700)} layout={Layout.springify()}>
+              <TouchableOpacity
+                style={[styles.actionButton, isTablet && styles.flexOne]}
+                onPress={handleEmail}
+              >
               <View style={styles.iconBox}>
                 <Mail size={moderateScale(20)} color={colors.primary.main} />
               </View>
@@ -244,7 +241,8 @@ export default function ChatScreen() {
                   )}
                 </View>
               </View>
-            </AnimatedTouchable>
+              </TouchableOpacity>
+            </Animated.View>
           </Animated.View>
         </View>
       </ScrollView>

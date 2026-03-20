@@ -24,6 +24,7 @@ interface Dependent {
   product_label: string;
   product_benefit: string;
   relationship: string;
+  dob: string | null;
 }
 
 interface PrimaryInfo {
@@ -83,23 +84,50 @@ export default function PlanDetailsScreen() {
           return;
         }
 
-        const { data: membersData, error: membersError } = await supabase
-          .from('members')
-          .select('member_id, first_name, last_name, product_label, product_benefit, relationship')
-          .eq('primary_id', primaryMemberId)
-          .eq('is_primary', false);
+        // Fetch dependents from both members and users tables
+        const [membersResult, usersResult] = await Promise.all([
+          supabase
+            .from('members')
+            .select('member_id, first_name, last_name, product_label, product_benefit, relationship, dob')
+            .eq('primary_id', primaryMemberId)
+            .eq('is_primary', false),
+          supabase
+            .from('users')
+            .select('member_id, first_name, last_name, product_label, product_benefit, relationship, dob')
+            .eq('primary_id', primaryMemberId)
+            .eq('is_primary', false),
+        ]);
 
-        if (membersError) throw membersError;
+        if (membersResult.error) throw membersResult.error;
+        if (usersResult.error) throw usersResult.error;
 
-        const dependentsWithId = (membersData || []).map((dep: Omit<Dependent, 'id'>): Dependent => ({
-          ...dep,
+        // Merge by member_id: prefer users (activated) over members (inactive)
+        const mergedMap = new Map<string, Dependent>();
+        const toDependent = (dep: { member_id: string; first_name: string | null; last_name: string | null; product_label: string | null; product_benefit: string | null; relationship: string | null; dob?: string | null }) => ({
           id: dep.member_id,
-        }));
+          member_id: dep.member_id,
+          first_name: dep.first_name ?? '',
+          last_name: dep.last_name ?? '',
+          product_label: dep.product_label ?? '',
+          product_benefit: dep.product_benefit ?? '',
+          relationship: dep.relationship ?? '',
+          dob: dep.dob ?? null,
+        });
 
-        const sortedDependents = dependentsWithId.sort((a: Dependent, b: Dependent) => {
-          if (a.relationship?.toLowerCase() === 'spouse') return -1;
-          if (b.relationship?.toLowerCase() === 'spouse') return 1;
-          return 0;
+        (membersResult.data || []).forEach((dep) => {
+          mergedMap.set(dep.member_id, toDependent(dep));
+        });
+        (usersResult.data || []).forEach((dep) => {
+          mergedMap.set(dep.member_id, toDependent(dep));
+        });
+
+        const merged = Array.from(mergedMap.values());
+
+        // Sort by age: older to younger (oldest first)
+        const sortedDependents = merged.sort((a, b) => {
+          const dobA = a.dob ? new Date(a.dob).getTime() : Infinity;
+          const dobB = b.dob ? new Date(b.dob).getTime() : Infinity;
+          return dobA - dobB; // ascending dob = oldest first
         });
 
         setDependents(sortedDependents);
