@@ -192,12 +192,23 @@ export default function NotificationsScreen() {
                           </View>
                         )}
                         <View style={styles.line}>
-                          <SmartText variant="body1" style={[styles.cardTitle, urgent && styles.cardTitleUrgent, welcome && styles.cardTitleWelcome]}>
+                          <SmartText
+                            variant="body1"
+                            truncate
+                            maxLines={1}
+                            adjustsFontSizeToFit={false}
+                            style={[styles.cardTitle, urgent && styles.cardTitleUrgent, welcome && styles.cardTitleWelcome]}
+                          >
                             {n.title}
                           </SmartText>
                           {!n.read && <View style={[styles.unreadDot, { backgroundColor: accent }]} />}
                         </View>
-                        <SmartText variant="body2" style={[styles.cardMsg, urgent && styles.cardMsgUrgent]}>
+                        <SmartText
+                          variant="body2"
+                          truncate
+                          maxLines={2}
+                          style={[styles.cardMsg, urgent && styles.cardMsgUrgent]}
+                        >
                           {n.message}
                         </SmartText>
                         <Text style={styles.cardDate}>{formatDate(n.date)}</Text>
@@ -266,14 +277,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   list: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   cardWrapper: {
     width: '100%',
   },
   card: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     minHeight: MIN_TOUCH_TARGET,
@@ -305,8 +316,8 @@ const styles = StyleSheet.create({
     width: 5,
   },
   iconWrap: {
-    width: moderateScale(44),
-    height: moderateScale(44),
+    width: moderateScale(40),
+    height: moderateScale(40),
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -324,10 +335,10 @@ const styles = StyleSheet.create({
   textBlock: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     paddingLeft: spacing.sm,
     paddingRight: spacing.xs,
-    gap: 4,
+    gap: 2,
   },
   line: {
     flexDirection: 'row',
@@ -394,8 +405,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   chevronWrap: {
-    paddingRight: spacing.md,
-    paddingVertical: spacing.md,
+    paddingRight: spacing.sm,
+    paddingVertical: spacing.sm,
     justifyContent: 'center',
     alignSelf: 'center',
   },
