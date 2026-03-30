@@ -28,13 +28,9 @@ import { BackButton } from '@/components/common/BackButton';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
-import {
-  colors,
-  shadows,
-  typography,
-  spacing,
-  borderRadius,
-} from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeSm, cardChromeMd, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 export default function CarePlusScreen() {
   const router = useRouter();
@@ -52,7 +48,7 @@ export default function CarePlusScreen() {
 
   if (showCancellation) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={headerStyle}>
           <BackButton onPress={() => setShowCancellation(false)} />
           <View style={styles.headerContent}>
@@ -68,7 +64,7 @@ export default function CarePlusScreen() {
 
   if (showPlanDetails) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={headerStyle}>
           <BackButton onPress={() => setShowPlanDetails(false)} />
           <View style={styles.headerContent}>
@@ -92,7 +88,7 @@ export default function CarePlusScreen() {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Plan Details</Text>
@@ -169,16 +165,15 @@ export default function CarePlusScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
@@ -204,7 +199,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     marginBottom: spacing.xl,
-    ...shadows.md,
+    ...cardChromeMd,
   },
   logo: {
     width: '100%',
@@ -241,7 +236,7 @@ const styles = StyleSheet.create({
     width: '48%',
     alignItems: 'center',
     marginBottom: spacing.sm,
-    ...shadows.sm,
+    ...cardChromeSm,
   },
   benefitCardWide: {
     width: '31%',
@@ -258,7 +253,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   viewDetailsContent: {
     flexDirection: 'row',

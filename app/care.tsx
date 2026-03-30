@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import {
@@ -30,10 +29,18 @@ import { SmartText } from '@/components/common/SmartText';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useCareServices, type CareService } from '@/hooks/useCareServices';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
-import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { colors } from '@/constants/theme';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import {
+  hubScreenHeader,
+  hubHeaderA11y,
+  hubScreenScroll,
+  hubListRow,
+  hubScreenStates,
+} from '@/utils/hubListScreenLayout';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useUserData } from '@/hooks/useUserData';
+import { screenChrome } from '@/utils/screenChrome';
 
 /** Hosts that block or restrict in-app WebViews; WebViewContainer opens them in the system browser. */
 const OPEN_IN_BROWSER_HOSTS: RegExp[] = [/zocdoc\.com/i];
@@ -51,7 +58,7 @@ export default function CareScreen() {
   const { services, loading, error, refetch } = useCareServices(userProductIdList);
   const [selectedService, setSelectedService] = useState<CareService | null>(null);
   const [webViewError, setWebViewError] = useState(false);
-  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
+  const headerStyle = [hubScreenHeader.bar, { paddingTop: headerPaddingTop }];
 
   if (selectedService) {
     const isBluebook = selectedService.serviceKey === 'bluebook';
@@ -59,7 +66,7 @@ export default function CareScreen() {
 
     return (
       <Animated.View
-        style={styles.container}
+        style={screenChrome.container}
         entering={SlideInRight}
         exiting={SlideOutLeft}
       >
@@ -68,24 +75,26 @@ export default function CareScreen() {
             setSelectedService(null);
             setWebViewError(false);
           }} />
-          <View style={styles.headerContent}>
-            <SmartText variant="h3" style={styles.headerTitle}>{selectedService.title}</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h3" style={hubScreenHeader.detailTitle} {...hubHeaderA11y.detailTitle}>
+              {selectedService.title}
+            </SmartText>
           </View>
         </View>
 
         {webViewError ? (
-          <View style={styles.errorContainer}>
+          <View style={hubScreenStates.errorContainer}>
             <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-            <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Service</SmartText>
-            <SmartText variant="body2" style={styles.errorText}>
+            <SmartText variant="h3" style={hubScreenStates.errorTitle}>Unable to Load Service</SmartText>
+            <SmartText variant="body2" style={hubScreenStates.errorText}>
               This service is temporarily unavailable. Please try again later or contact support.
             </SmartText>
             <TouchableOpacity
-              style={styles.retryButton}
+              style={hubScreenStates.retryButton}
               onPress={() => setWebViewError(false)}
             >
               <RefreshCw size={moderateScale(20)} color={colors.background.default} />
-              <SmartText variant="body1" style={styles.retryButtonText}>Try Again</SmartText>
+              <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Try Again</SmartText>
             </TouchableOpacity>
           </View>
         ) : (
@@ -113,14 +122,18 @@ export default function CareScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Care Services
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.loadingContainer}>
+        <View style={hubScreenStates.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <SmartText variant="body1" style={styles.loadingText}>Loading services...</SmartText>
+          <SmartText variant="body1" style={hubScreenStates.loadingText}>Loading services...</SmartText>
         </View>
       </View>
     );
@@ -128,18 +141,22 @@ export default function CareScreen() {
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Care Services
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.errorContainer}>
+        <View style={hubScreenStates.errorContainer}>
           <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Services</SmartText>
-          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
-          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
+          <SmartText variant="h3" style={hubScreenStates.errorTitle}>Unable to Load Services</SmartText>
+          <SmartText variant="body2" style={hubScreenStates.errorText}>{error}</SmartText>
+          <TouchableOpacity style={hubScreenStates.retryButton} onPress={refetch}>
             <RefreshCw size={moderateScale(20)} color={colors.background.default} />
-            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
+            <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -148,10 +165,14 @@ export default function CareScreen() {
 
   if (services.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Care Services
+            </SmartText>
+          </View>
         </Animated.View>
         <EmptyState
           icon={<Heart size={moderateScale(48)} color={colors.gray[300]} />}
@@ -164,21 +185,26 @@ export default function CareScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>Care Services</SmartText>
+        <View style={hubScreenHeader.content}>
+          <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+            Care Services
+          </SmartText>
+        </View>
       </Animated.View>
 
       <ScrollView
-        style={styles.content}
+        style={[hubScreenScroll.content, hubScreenScroll.contentShade]}
         overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, hubScreenScroll.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xl }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[hubScreenScroll.maxWidthContainer, isTablet && hubScreenScroll.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
-            <SmartText variant="body1" style={styles.description}>
+            <SmartText variant="body1" style={hubScreenScroll.description}>
               Find PHCS Specific Services network providers, facilities and procedure costs, and schedule appointments online.
             </SmartText>
           </Animated.View>
@@ -193,28 +219,30 @@ export default function CareScreen() {
                   layout={Layout.springify()}
                 >
                   <TouchableOpacity
-                    style={styles.serviceCard}
+                    style={hubListRow.card}
                     onPress={() => setSelectedService(service)}
                     activeOpacity={0.9}
                     accessibilityLabel={`Open ${service.title}`}
                     accessibilityRole="button"
                   >
-                    <View style={styles.serviceContent}>
+                    <View style={hubListRow.rowInner}>
                       <View
-                        style={[styles.iconContainer, { backgroundColor: service.gradient }]}
+                        style={[hubListRow.iconTile, { backgroundColor: service.gradient }]}
                       >
-                        <ServiceIcon size={moderateScale(26)} color={service.color} />
+                        <ServiceIcon size={moderateScale(24)} color={service.color} />
                       </View>
-                      <View style={styles.textContainer}>
-                        <SmartText variant="body1" style={styles.serviceTitle}>
+                      <View style={hubListRow.textBlock}>
+                        <SmartText variant="body1" style={hubListRow.rowTitle}>
                           {service.title}
                         </SmartText>
-                        <SmartText variant="body2" style={styles.serviceDescription}>
+                        <SmartText variant="body2" style={hubListRow.rowDescription}>
                           {service.description}
                         </SmartText>
                       </View>
                     </View>
-                    <ExternalLink size={moderateScale(18)} color={service.color} />
+                    <View style={[hubListRow.openHint, { borderWidth: 0, backgroundColor: service.gradient }]}>
+                      <ExternalLink size={moderateScale(18)} color={service.color} />
+                    </View>
                   </TouchableOpacity>
                 </Animated.View>
               );
@@ -227,136 +255,7 @@ export default function CareScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper
-  },
-
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
-    minWidth: 0,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  title: {
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-  },
-
-  content: {
-    flex: 1
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
-  },
-  tabletMaxWidth: {
-    maxWidth: 900,
-  },
-
-  description: {
-    color: colors.text.secondary,
-    marginBottom: responsiveSize.lg,
-  },
-
   servicesGrid: {
     gap: responsiveSize.md,
   },
-
-  serviceCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
-  },
-  serviceContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    minWidth: 0,
-  },
-  iconContainer: {
-    width: moderateScale(48),
-    height: moderateScale(48),
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    flexShrink: 0,
-  },
-  textContainer: {
-    flex: 1,
-    minWidth: 0,
-    gap: responsiveSize.xs / 2,
-  },
-  serviceTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  serviceDescription: {
-    color: colors.text.secondary,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  loadingText: {
-    color: colors.text.secondary,
-  },
-
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  errorTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  errorText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: responsiveSize.lg,
-    paddingVertical: responsiveSize.sm,
-    borderRadius: borderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: responsiveSize.xs,
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
-  },
-  retryButtonText: {
-    fontWeight: '600',
-    color: colors.background.default,
-  },
-
 });

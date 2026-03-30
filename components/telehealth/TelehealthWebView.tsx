@@ -1,19 +1,20 @@
-import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import {
   StyleSheet,
   View,
-  ActivityIndicator,
   Platform,
-  BackHandler,
-  Alert,
-  TouchableOpacity
+  TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SmartText } from '@/components/common/SmartText';
-import { colors, borderRadius, shadows } from '@/constants/theme';
-import { responsiveSize, moderateScale } from '@/utils/scaling';
-import { generateInjectionScript } from './telehealthWebViewInjection';
+import { buildWebViewInjectionScript } from '@/components/common/WebViewContainer';
+import { colors, borderRadius } from '@/constants/theme';
+import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { buildTelehealthBridgeScript } from './telehealthWebViewInjection';
 import { TelehealthWebViewProps, WebViewMessage } from './types';
+import { TelehealthLoadingPanel } from './TelehealthLoadingPanel';
+import { TELEHEALTH_LOADING } from './telehealthLoadingCopy';
 
 export interface TelehealthWebViewRef {
   goBackInWebView: () => boolean;
@@ -22,7 +23,7 @@ export interface TelehealthWebViewRef {
 
 export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebViewProps>(({
   url,
-  memberId,
+  memberId: _memberId,
   initialUrl,
   style,
   onLoadStart,
@@ -32,19 +33,34 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
   onFormStateChange,
   onFormSubmitSuccess,
   onSessionExpired,
-  headers = {}
+  headers = {},
+  loadingSubtitle,
 }, ref) => {
   const webViewRef = useRef<WebView>(null);
+  const insets = useSafeAreaInsets();
 
-  const [isLoading, setIsLoading] = useState(true);
+  /** Full card overlay only until the first page finishes loading. */
+  const [showInitialOverlay, setShowInitialOverlay] = useState(true);
+  /** 0 = hidden; otherwise thin top bar while navigating inside the portal */
+  const [navProgress, setNavProgress] = useState(0);
   const [hasError, setHasError] = useState(false);
-  const [hasUnsavedData, setHasUnsavedData] = useState(false);
-  const [isFrozen, setIsFrozen] = useState(false);
 
   const canGoBackRef = useRef(false);
   const initialUrlRef = useRef(initialUrl || url);
   const freezeCountRef = useRef(0);
+  const isRecoveringFromFreezeRef = useRef(false);
   const currentUrlRef = useRef(url);
+  const initialLoadFinishedRef = useRef(false);
+
+  const injectedScript = useMemo(() => {
+    const portal = buildWebViewInjectionScript('portal', {
+      top: insets.top,
+      bottom: insets.bottom,
+      left: insets.left,
+      right: insets.right,
+    });
+    return `${portal}\n${buildTelehealthBridgeScript()}`;
+  }, [insets.top, insets.bottom, insets.left, insets.right]);
 
   const ANDROID_CHROME_UA =
     'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
@@ -54,16 +70,17 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
   const userAgent = Platform.select({
     ios: IOS_SAFARI_UA,
     android: ANDROID_CHROME_UA,
-    default: ANDROID_CHROME_UA
+    default: ANDROID_CHROME_UA,
   });
 
+  const webSubtitle = loadingSubtitle ?? TELEHEALTH_LOADING.subtitleWebView;
+
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-    return () => backHandler.remove();
-  }, [hasUnsavedData]);
+    initialUrlRef.current = initialUrl || url;
+    currentUrlRef.current = url;
+  }, [url, initialUrl]);
 
   const handleFormStateChange = useCallback((hasData: boolean) => {
-    setHasUnsavedData(hasData);
     onFormStateChange?.(hasData);
   }, [onFormStateChange]);
 
@@ -79,7 +96,7 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
           break;
 
         case 'formSubmit':
-          setHasUnsavedData(false);
+          onFormStateChange?.(false);
           onFormSubmitSuccess?.();
           break;
 
@@ -87,8 +104,8 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
           console.warn('WebView freeze detected:', message.data);
           freezeCountRef.current += 1;
 
-          if (freezeCountRef.current <= 3 && !isFrozen) {
-            setIsFrozen(true);
+          if (freezeCountRef.current <= 3 && !isRecoveringFromFreezeRef.current) {
+            isRecoveringFromFreezeRef.current = true;
 
             setTimeout(() => {
               if (webViewRef.current) {
@@ -97,7 +114,7 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
               }
 
               setTimeout(() => {
-                setIsFrozen(false);
+                isRecoveringFromFreezeRef.current = false;
                 freezeCountRef.current = 0;
               }, 2000);
             }, 500);
@@ -107,63 +124,39 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
         case 'error':
           console.error('WebView error:', message.data);
           break;
-
-        case 'consoleLog':
-          if (message.data?.level === 'error') {
-            // Filter out Google Maps duplicate API error as it's not critical
-            if (!message.data.message.includes('Google Maps JavaScript API multiple times')) {
-              console.error('WebView console error:', message.data.message);
-            }
-          }
-          break;
       }
     } catch (error) {
       console.error('Error handling WebView message:', error);
     }
-  }, [handleFormStateChange, onFormSubmitSuccess]);
-
-  const handleBackPress = (): boolean => {
-    if (hasUnsavedData && Platform.OS === 'android') {
-      Alert.alert(
-        'Unsaved Changes',
-        'You have unsaved form data. Are you sure you want to go back?',
-        [
-          { text: 'Stay', style: 'cancel' },
-          {
-            text: 'Leave',
-            style: 'destructive',
-            onPress: () => {
-              if (canGoBackRef.current && webViewRef.current) {
-                webViewRef.current.goBack();
-              }
-            }
-          }
-        ]
-      );
-      return true;
-    }
-
-    if (canGoBackRef.current && webViewRef.current) {
-      webViewRef.current.goBack();
-      return true;
-    }
-
-    return false;
-  };
+  }, [handleFormStateChange, onFormSubmitSuccess, onFormStateChange]);
 
   const handleLoadStart = () => {
-    setIsLoading(true);
     setHasError(false);
+    if (!initialLoadFinishedRef.current) {
+      setShowInitialOverlay(true);
+    } else {
+      setNavProgress(0.08);
+    }
     onLoadStart?.();
   };
 
+  const handleLoadProgress = (e: { nativeEvent: { progress: number } }) => {
+    if (initialLoadFinishedRef.current) {
+      const p = e?.nativeEvent?.progress ?? 0;
+      setNavProgress(Math.max(0.08, p));
+    }
+  };
+
   const handleLoadEnd = () => {
-    setIsLoading(false);
+    initialLoadFinishedRef.current = true;
+    setShowInitialOverlay(false);
+    setNavProgress(0);
     onLoadEnd?.();
   };
 
   const handleLoadError = (error: any) => {
-    setIsLoading(false);
+    setShowInitialOverlay(false);
+    setNavProgress(0);
     setHasError(true);
     onError?.(error);
   };
@@ -188,9 +181,14 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
   };
 
   const handleNavChange = (navState: WebViewNavigation) => {
-    canGoBackRef.current = navState.canGoBack && !isAtHomePage(navState.url);
+    const atHome = isAtHomePage(navState.url);
+    const effectiveCanGoBack = Boolean(navState.canGoBack && !atHome);
+    canGoBackRef.current = effectiveCanGoBack;
     currentUrlRef.current = navState.url;
-    onNavigationStateChange?.(navState);
+    onNavigationStateChange?.({
+      ...navState,
+      canGoBack: effectiveCanGoBack,
+    });
   };
 
   const goBackInWebView = () => {
@@ -203,12 +201,13 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
 
   useImperativeHandle(ref, () => ({
     goBackInWebView,
-    reload: () => webViewRef.current?.reload()
+    reload: () => webViewRef.current?.reload(),
   }));
 
   const handleRetry = () => {
     setHasError(false);
-    setIsLoading(true);
+    initialLoadFinishedRef.current = false;
+    setShowInitialOverlay(true);
     webViewRef.current?.reload();
   };
 
@@ -234,13 +233,18 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
 
   return (
     <View style={[styles.container, style]}>
+      {navProgress > 0 && (
+        <View style={styles.progressTrack} pointerEvents="none">
+          <View style={[styles.progressFill, { width: `${Math.min(100, navProgress * 100)}%` }]} />
+        </View>
+      )}
       <WebView
         ref={webViewRef}
         source={{ uri: url, headers }}
         style={styles.webview}
         originWhitelist={['*']}
-        injectedJavaScript={generateInjectionScript()}
-        injectedJavaScriptBeforeContentLoaded={generateInjectionScript()}
+        injectedJavaScript={injectedScript}
+        injectedJavaScriptBeforeContentLoaded={injectedScript}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         thirdPartyCookiesEnabled={true}
@@ -264,12 +268,18 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
         contentInsetAdjustmentBehavior="automatic"
         pullToRefreshEnabled={false}
         androidLayerType="hardware"
-        scalesPageToFit={true}
         onMessage={handleMessage}
         onLoadStart={handleLoadStart}
+        onLoadProgress={handleLoadProgress}
         onLoadEnd={handleLoadEnd}
         onError={handleLoadError}
         onNavigationStateChange={handleNavChange}
+        onShouldStartLoadWithRequest={(request) => {
+          const u = (request.url || '').trim().toLowerCase();
+          if (u.startsWith('javascript:')) return false;
+          if (u.startsWith('file:')) return false;
+          return true;
+        }}
         onHttpError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           if (nativeEvent.statusCode === 401 || nativeEvent.statusCode === 403) {
@@ -278,12 +288,18 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
         }}
       />
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.main} />
-          <SmartText variant="body2" style={styles.loadingText} maxLines={1}>
-            Loading telehealth portal...
-          </SmartText>
+      {showInitialOverlay && (
+        <View style={styles.loadingOverlay} pointerEvents="auto">
+          <View style={styles.loadingScrim} pointerEvents="none" />
+          <View style={styles.loadingPanelWrap}>
+            <TelehealthLoadingPanel
+              variant="card"
+              elevated
+              title={TELEHEALTH_LOADING.title}
+              subtitle={webSubtitle}
+              compact
+            />
+          </View>
         </View>
       )}
     </View>
@@ -293,41 +309,56 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.default
+    backgroundColor: colors.background.paper,
   },
   webview: {
     flex: 1,
-    backgroundColor: colors.background.default
+    backgroundColor: colors.background.default,
   },
-  loadingContainer: {
+  progressTrack: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    height: moderateScale(3),
+    backgroundColor: colors.gray[100],
+    zIndex: 10,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary.main,
+    borderRadius: moderateScale(2),
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background.default,
-    gap: responsiveSize.md
+    paddingHorizontal: responsiveSize.xl,
+    zIndex: 5,
   },
-  loadingText: {
-    color: colors.text.secondary,
-    marginTop: responsiveSize.sm
+  loadingScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.46)',
+  },
+  loadingPanelWrap: {
+    width: '100%',
+    alignItems: 'center',
+    zIndex: 1,
   },
   errorContainer: {
     flex: 1,
     padding: responsiveSize.xxl,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: responsiveSize.md
+    gap: responsiveSize.md,
   },
   errorTitle: {
     color: colors.text.primary,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   errorText: {
     color: colors.text.secondary,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   retryButton: {
     backgroundColor: colors.primary.main,
@@ -335,12 +366,12 @@ const styles = StyleSheet.create({
     paddingVertical: responsiveSize.md,
     borderRadius: borderRadius.lg,
     marginTop: responsiveSize.md,
-    ...shadows.md
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   retryButtonText: {
     color: colors.background.default,
-    fontWeight: '600'
-  }
+    fontWeight: '600',
+  },
 });
 
 TelehealthWebView.displayName = 'TelehealthWebView';

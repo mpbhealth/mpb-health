@@ -1,4 +1,4 @@
-import { View, StyleSheet, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
@@ -6,7 +6,8 @@ import { Card } from '@/components/common/Card';
 import { Heart, Phone, Ambulance, Calendar, AlertCircle } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import { screenChrome, screenHeaderRow } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 
@@ -90,22 +91,27 @@ export default function WhatToDoScreen() {
   ];
 
   return (
-    <View style={styles.container}>
-      <Animated.View
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
-        entering={FadeInDown.delay(100)}
-      >
+    <View style={screenChrome.container}>
+      <Animated.View style={screenHeaderRow(headerPaddingTop)} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>What to do?</SmartText>
+        <View style={screenChrome.headerTitleColumn}>
+          <SmartText variant="overline" style={screenChrome.overline} numberOfLines={2} ellipsizeMode="tail">
+            Guide
+          </SmartText>
+          <SmartText variant="h2" style={styles.headerH2} numberOfLines={2} ellipsizeMode="tail">
+            What to do?
+          </SmartText>
+        </View>
+        <View style={styles.headerSpacer} />
       </Animated.View>
 
       <ScrollView
         overScrollMode="never"
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[screenChrome.maxWidth, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
             <Card padding="md" variant="outlined" style={styles.introCard}>
               <AlertCircle size={moderateScale(22)} color={colors.primary.main} style={{ marginRight: responsiveSize.sm }} />
@@ -174,35 +180,15 @@ export default function WhatToDoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  title: {
+  headerH2: {
     fontWeight: '700',
     color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-    flex: 1,
-    minWidth: 0,
+  },
+  headerSpacer: {
+    width: 40,
   },
   content: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
   },
   tabletMaxWidth: {
     maxWidth: 900,
@@ -227,14 +213,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: responsiveSize.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     gap: responsiveSize.sm,
   },
   iconContainer: {
     width: moderateScale(44),
     height: moderateScale(44),
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,

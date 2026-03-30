@@ -1,22 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  Platform,
-  Alert,
-  BackHandler,
-  Image,
-} from 'react-native';
+import { View, StyleSheet, Platform, Alert, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { MessageSquare } from 'lucide-react-native';
 import { BackButton } from '@/components/common/BackButton';
+import { BrandedLoadingPanel } from '@/components/common/BrandedLoadingPanel';
 import { SmartText } from '@/components/common/SmartText';
 import WebView from 'react-native-webview';
-import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { colors } from '@/constants/theme';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import { screenChrome, screenHeaderRow } from '@/utils/screenChrome';
 
 const htmlContent = `
 <!DOCTYPE html>
@@ -41,9 +35,7 @@ const htmlContent = `
       justify-content: center;
       align-items: center;
       height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      color: #666;
-      font-size: 16px;
+      background: #FFFFFF;
     }
     #error {
       display: none;
@@ -52,28 +44,10 @@ const htmlContent = `
       color: #d32f2f;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
-    .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #3498db;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 10px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
   </style>
 </head>
 <body>
-  <div id="loading">
-    <div>
-      <div class="spinner"></div>
-      <div>Loading chat...</div>
-    </div>
-  </div>
+  <div id="loading"></div>
   <div id="error"></div>
 
   <script>
@@ -153,7 +127,6 @@ const htmlContent = `
 
 export default function ChatScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { headerPaddingTop } = useSafeHeaderPadding();
   const [isChatActive, setIsChatActive] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -205,8 +178,8 @@ export default function ChatScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
+    <View style={screenChrome.container}>
+      <Animated.View style={screenHeaderRow(headerPaddingTop)} entering={FadeInDown.delay(100)}>
         <BackButton onPress={confirmExit} />
         <View style={styles.titleContainer}>
           <MessageSquare size={moderateScale(24)} color={colors.primary.main} />
@@ -254,16 +227,21 @@ export default function ChatScreen() {
           {isLoading && (
             <Animated.View
               style={styles.splashOverlay}
+              entering={FadeIn.duration(280)}
               exiting={FadeOut.duration(400)}
+              pointerEvents="auto"
             >
-              <Image
-                source={require('@/assets/images/logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-              <SmartText variant="body1" style={styles.loadingText}>
-                Connecting to chat...
-              </SmartText>
+              <View style={styles.splashScrim} pointerEvents="none" />
+              <View style={styles.splashPanelWrap}>
+                <BrandedLoadingPanel
+                  variant="card"
+                  elevated
+                  compact
+                  title="Opening secure chat"
+                  subtitle="We're connecting you to Concierge. This usually takes a few seconds."
+                  hint="Don't close this screen"
+                />
+              </View>
             </Animated.View>
           )}
 
@@ -287,22 +265,8 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.default,
-  },
   flex: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: responsiveSize.md,
-    paddingBottom: responsiveSize.md,
-    backgroundColor: colors.background.default,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   titleContainer: {
     flexDirection: 'row',
@@ -333,19 +297,19 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.background.default,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: responsiveSize.xl,
     zIndex: 10,
   },
-  logo: {
-    width: responsiveSize.xl * 3,
-    height: responsiveSize.xl * 3,
-    marginBottom: responsiveSize.lg,
+  splashScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.46)',
   },
-  loadingText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
+  splashPanelWrap: {
+    width: '100%',
+    alignItems: 'center',
+    zIndex: 1,
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,

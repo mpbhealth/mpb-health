@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { colors, typography, spacing } from '@/constants/theme';
 import * as Linking from 'expo-linking';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { screenChrome } from '@/utils/screenChrome';
+import { cardChromeSm } from '@/utils/scaling';
 
 export default function EmailConfirmScreen() {
   const router = useRouter();
@@ -79,7 +81,7 @@ export default function EmailConfirmScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { paddingTop: headerPaddingTop }]}>
+    <View style={[screenChrome.container, { paddingTop: headerPaddingTop, justifyContent: 'center', alignItems: 'center' }]}>
       <View style={styles.content}>
         <ActivityIndicator size="large" color={colors.primary.main} />
         <Text style={styles.messageTitle}>Confirming your email...</Text>
@@ -92,17 +94,12 @@ export default function EmailConfirmScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.default,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   content: {
     alignItems: 'center',
     padding: spacing.xl,
     borderRadius: spacing.md,
-    backgroundColor: colors.background.paper,
+    backgroundColor: colors.background.default,
+    ...cardChromeSm,
   },
   messageTitle: {
     ...typography.h3,

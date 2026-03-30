@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
   ActivityIndicator,
   BackHandler,
 } from 'react-native';
@@ -33,8 +32,16 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { useUserData } from '@/hooks/useUserData';
 import { useMemberForms, type MemberForm } from '@/hooks/useMemberForms';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import {
+  hubScreenHeader,
+  hubHeaderA11y,
+  hubScreenScroll,
+  hubListRow,
+  hubScreenStates,
+} from '@/utils/hubListScreenLayout';
 import { useResponsive } from '@/hooks/useResponsive';
+import { screenChrome } from '@/utils/screenChrome';
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -51,7 +58,7 @@ export default function MemberServicesScreen() {
   const insets = useSafeAreaInsets();
   const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { isTablet } = useResponsive();
-  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
+  const headerStyle = [hubScreenHeader.bar, { paddingTop: headerPaddingTop }];
   const { userData } = useUserData();
   const { forms, loading, error, refetch } = useMemberForms();
 
@@ -88,14 +95,16 @@ export default function MemberServicesScreen() {
 
     return (
       <Animated.View
-        style={styles.container}
+        style={screenChrome.container}
         entering={SlideInRight}
         exiting={SlideOutLeft}
       >
         <View style={headerStyle}>
           <BackButton onPress={() => setSelectedService(null)} />
-          <View style={styles.headerContent}>
-            <SmartText variant="h3" style={styles.headerTitle}>Member Forms</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h3" style={hubScreenHeader.detailTitle} {...hubHeaderA11y.detailTitle}>
+              {selectedService.title}
+            </SmartText>
           </View>
         </View>
 
@@ -206,14 +215,18 @@ export default function MemberServicesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Member Forms
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.loadingContainer}>
+        <View style={hubScreenStates.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <SmartText variant="body1" style={styles.loadingText}>Loading forms...</SmartText>
+          <SmartText variant="body1" style={hubScreenStates.loadingText}>Loading forms...</SmartText>
         </View>
       </View>
     );
@@ -221,18 +234,22 @@ export default function MemberServicesScreen() {
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Member Forms
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.errorContainer}>
+        <View style={hubScreenStates.errorContainer}>
           <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Forms</SmartText>
-          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
-          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
+          <SmartText variant="h3" style={hubScreenStates.errorTitle}>Unable to Load Forms</SmartText>
+          <SmartText variant="body2" style={hubScreenStates.errorText}>{error}</SmartText>
+          <TouchableOpacity style={hubScreenStates.retryButton} onPress={refetch}>
             <RefreshCw size={moderateScale(20)} color={colors.background.default} />
-            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
+            <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -241,10 +258,14 @@ export default function MemberServicesScreen() {
 
   if (forms.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Member Forms
+            </SmartText>
+          </View>
         </Animated.View>
         <EmptyState
           icon={<FileText size={moderateScale(48)} color={colors.gray[300]} />}
@@ -257,26 +278,31 @@ export default function MemberServicesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>Member Forms</SmartText>
+        <View style={hubScreenHeader.content}>
+          <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+            Member Forms
+          </SmartText>
+        </View>
       </Animated.View>
 
       <ScrollView
-        style={styles.content}
+        style={[hubScreenScroll.content, hubScreenScroll.contentShade]}
         overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, hubScreenScroll.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.lg }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[hubScreenScroll.maxWidthContainer, isTablet && hubScreenScroll.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
-            <SmartText variant="body1" style={styles.description}>
-              Manage your membership and access self-service options
+            <SmartText variant="body1" style={hubScreenScroll.description}>
+              Choose a form to open it in the app. Use the same links for scheduling, member updates, and other self-service tasks.
             </SmartText>
           </Animated.View>
 
-          <View style={isTablet ? styles.gridContainer : undefined}>
+          <View style={isTablet ? styles.gridContainer : styles.formList}>
             {forms.map((form, index) => {
               const FormIcon = form.icon;
               return (
@@ -286,17 +312,22 @@ export default function MemberServicesScreen() {
                   layout={Layout.springify()}
                 >
                   <TouchableOpacity
-                    style={[styles.serviceCard, isTablet && styles.serviceCardWide]}
+                    style={[hubListRow.card, isTablet && styles.serviceCardWide]}
                     onPress={() => setSelectedService(form)}
                     activeOpacity={0.9}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${form.title}`}
                   >
-                    <View style={styles.serviceContent}>
-                      <View style={[styles.iconContainer, { backgroundColor: form.gradient }]}>
-                        <FormIcon size={moderateScale(24)} color={form.color} />
+                    <View style={hubListRow.rowInner}>
+                      <View style={[hubListRow.iconTile, { backgroundColor: form.gradient }]}>
+                        <FormIcon size={moderateScale(22)} color={form.color} />
                       </View>
                       <View style={styles.textContainer}>
                         <View style={styles.titleRow}>
-                          <SmartText variant="body1" style={styles.serviceTitle}>
+                          <SmartText
+                            variant="body1"
+                            style={[hubListRow.rowTitle, styles.serviceTitleFlex]}
+                          >
                             {form.title}
                           </SmartText>
                           {form.badge && (
@@ -307,12 +338,14 @@ export default function MemberServicesScreen() {
                             </View>
                           )}
                         </View>
-                        <SmartText variant="body2" style={styles.serviceDescription}>
+                        <SmartText variant="body2" style={hubListRow.rowDescription}>
                           {form.description}
                         </SmartText>
                       </View>
                     </View>
-                    <ExternalLink size={moderateScale(18)} color={form.color} />
+                    <View style={[hubListRow.openHint, { borderWidth: 0, backgroundColor: form.gradient }]}>
+                      <ExternalLink size={moderateScale(18)} color={form.color} />
+                    </View>
                   </TouchableOpacity>
                 </Animated.View>
               );
@@ -337,87 +370,18 @@ export default function MemberServicesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
+  formList: {
+    gap: responsiveSize.md,
   },
-
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
-    minWidth: 0,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  title: {
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-  },
-
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
-  },
-  tabletMaxWidth: {
-    maxWidth: 900,
-  },
-
-  description: {
-    color: colors.text.secondary,
-    marginBottom: responsiveSize.lg,
-  },
-
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: responsiveSize.md,
   },
 
-  serviceCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.md,
-    marginBottom: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
-  },
   serviceCardWide: {
     width: '48%',
-  },
-  serviceContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    minWidth: 0,
-  },
-  iconContainer: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    flexShrink: 0,
   },
   textContainer: {
     flex: 1,
@@ -426,18 +390,14 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: responsiveSize.xs / 2,
   },
-  serviceTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
+  serviceTitleFlex: {
     flex: 1,
-  },
-  serviceDescription: {
-    color: colors.text.secondary,
+    minWidth: 0,
   },
 
   badge: {
@@ -453,7 +413,7 @@ const styles = StyleSheet.create({
     backgroundColor: rgbaFromHex(colors.status.info, 0.08),
     borderColor: rgbaFromHex(colors.status.info, 0.2),
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: responsiveSize.md,
     marginBottom: responsiveSize.lg,
   },
@@ -468,47 +428,7 @@ const styles = StyleSheet.create({
   },
   supportText: {
     color: colors.status.info,
+    lineHeight: 20,
   },
 
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  loadingText: {
-    color: colors.text.secondary,
-  },
-
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  errorTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  errorText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: responsiveSize.lg,
-    paddingVertical: responsiveSize.sm,
-    borderRadius: borderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: responsiveSize.xs,
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
-  },
-  retryButtonText: {
-    fontWeight: '600',
-    color: colors.background.default,
-  },
 });

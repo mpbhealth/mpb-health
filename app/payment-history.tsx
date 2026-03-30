@@ -16,6 +16,7 @@ import { useUserData } from '@/hooks/useUserData';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { colors } from '@/constants/theme';
 import { responsiveSize, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 export default function PaymentHistoryScreen() {
   const router = useRouter();
@@ -52,17 +53,17 @@ export default function PaymentHistoryScreen() {
   }, [handleBackPress]);
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
         <View style={styles.headerTopRow}>
           <BackButton onPress={handleBackPress} />
           <SmartText variant="h2" style={styles.title}>Payment</SmartText>
         </View>
         <View style={styles.headerDetails}>
-          <SmartText variant="body2" style={styles.headerDetailText} numberOfLines={1}>
+          <SmartText variant="body2" style={styles.headerDetailText} numberOfLines={3} ellipsizeMode="tail">
             Your Member ID: {userData?.member_id ?? '—'}
           </SmartText>
-          <SmartText variant="body2" style={styles.headerDetailText} numberOfLines={1}>
+          <SmartText variant="body2" style={styles.headerDetailText} numberOfLines={3} ellipsizeMode="tail">
             Your Email: {userData?.email ?? '—'}
           </SmartText>
         </View>
@@ -78,13 +79,12 @@ export default function PaymentHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
+    paddingHorizontal: responsiveSize.md,
+    paddingBottom: responsiveSize.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerTopRow: {
@@ -105,5 +105,6 @@ const styles = StyleSheet.create({
   },
   headerDetailText: {
     color: colors.text.secondary,
+    flexShrink: 1,
   },
 });

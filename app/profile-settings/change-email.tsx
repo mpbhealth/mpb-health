@@ -17,8 +17,9 @@ import { supabase } from '@/lib/supabase';
 import { useUserData } from '@/hooks/useUserData';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles, cardChromeSm } from '@/utils/scaling';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { screenChrome } from '@/utils/screenChrome';
 import { useResponsive } from '@/hooks/useResponsive';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -114,7 +115,7 @@ export default function ChangeEmailScreen() {
 
   if (showUpdateMembership) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={headerStyle}>
           <BackButton onPress={() => setShowUpdateMembership(false)} />
           <View style={styles.headerContent}>
@@ -127,7 +128,7 @@ export default function ChangeEmailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title}>Change Email</SmartText>
@@ -137,7 +138,7 @@ export default function ChangeEmailScreen() {
         style={styles.content}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, styles.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xl }]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
@@ -312,15 +313,14 @@ export default function ChangeEmailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
+    paddingHorizontal: responsiveSize.md,
+    paddingBottom: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
@@ -341,9 +341,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
+  scrollPad: {
+    paddingHorizontal: responsiveSize.md,
   },
 
   maxWidthContainer: {
@@ -484,7 +483,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     alignItems: 'center',
     minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
+    elevation: 0,
+    ...(Platform.OS === 'ios' ? platformStyles.shadow : {}),
   },
   submitButtonDisabled: {
     opacity: 0.7,
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
+    ...cardChromeSm,
   },
   navigationButtonContent: {
     flex: 1,

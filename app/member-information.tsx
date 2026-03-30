@@ -1,4 +1,4 @@
-import { View, StyleSheet, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { User } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -9,7 +9,8 @@ import { useUserData } from '@/hooks/useUserData';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import { screenChrome, screenHeaderRow } from '@/utils/screenChrome';
 import { useResponsive } from '@/hooks/useResponsive';
 
 function rgbaFromHex(hex: string, alpha: number) {
@@ -45,22 +46,27 @@ export default function PersonalInformationScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Animated.View
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
-        entering={FadeInDown.delay(100)}
-      >
+    <View style={screenChrome.container}>
+      <Animated.View style={screenHeaderRow(headerPaddingTop)} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>Personal Information</SmartText>
+        <View style={screenChrome.headerTitleColumn}>
+          <SmartText variant="overline" style={screenChrome.overline} numberOfLines={2} ellipsizeMode="tail">
+            Account
+          </SmartText>
+          <SmartText variant="h2" style={styles.headerH2} numberOfLines={2} ellipsizeMode="tail">
+            Personal Information
+          </SmartText>
+        </View>
+        <View style={styles.headerSpacer} />
       </Animated.View>
 
       <ScrollView
         style={styles.content}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[screenChrome.maxWidth, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
             <Card padding="lg" style={styles.infoCard}>
               <View style={styles.infoHeader}>
@@ -102,35 +108,15 @@ export default function PersonalInformationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  title: {
-    fontWeight: '700',
+  headerH2: {
     color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-    flex: 1,
-    minWidth: 0,
+    fontWeight: '700',
+  },
+  headerSpacer: {
+    width: 40,
   },
   content: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
   },
   tabletMaxWidth: {
     maxWidth: 900,
@@ -163,8 +149,8 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     paddingBottom: responsiveSize.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
   },
   infoRowLast: {
     paddingBottom: 0,

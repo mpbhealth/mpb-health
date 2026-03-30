@@ -20,6 +20,7 @@ export function usePushTokenRegistration(userId: string | undefined) {
       registered.current = false;
       return;
     }
+    const uid = userId;
     const isExpoGo =
       Constants.appOwnership === 'expo' ||
       Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -74,7 +75,7 @@ export function usePushTokenRegistration(userId: string | undefined) {
         logger.debug('Push registration: upserting to push_tokens…');
         const { error } = await supabase.from('push_tokens').upsert(
           {
-            user_id: userId,
+            user_id: uid,
             expo_push_token: expoPushToken,
             device_id: Constants.sessionId ?? null,
             platform: Platform.OS,
@@ -90,10 +91,10 @@ export function usePushTokenRegistration(userId: string | undefined) {
           return;
         }
         registered.current = true;
-        logger.debug('Push token registered successfully', { userId });
+        logger.debug('Push token registered successfully', { userId: uid });
 
         if (cancelled) return;
-        await sendWelcomeNotificationIfNew(userId);
+        await sendWelcomeNotificationIfNew(uid);
       } catch (err: unknown) {
         if (err !== null && err !== undefined) {
           logger.error('Push token registration failed', err);

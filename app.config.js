@@ -121,6 +121,12 @@ export default ({ config }) => ({
     plugins: [
       'expo-router',
       [
+        'expo-video',
+        {
+          supportsPictureInPicture: true,
+        },
+      ],
+      [
         'expo-camera',
         {
           cameraPermission: 'Allow MPB Health to access your camera.',

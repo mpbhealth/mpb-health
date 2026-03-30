@@ -8,7 +8,9 @@ import { AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Constants from 'expo-constants';
 import { useAuth } from '@/hooks/useAuth';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeSm, cardChromeLg, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const MAX_RETRY_ATTEMPTS = 3;
@@ -204,9 +206,9 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={screenChrome.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
-        style={styles.container}
+        style={screenChrome.container}
         overScrollMode="never"
         contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
@@ -309,14 +311,13 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.default },
   scrollContent: { flexGrow: 1, padding: spacing.lg },
   content: { flex: 1, width: '100%', maxWidth: 400, alignSelf: 'center' },
 
   header: { marginBottom: spacing.xxl },
   backButton: {
     width: 40, height: 40, borderRadius: borderRadius.full,
-    backgroundColor: colors.gray[100], justifyContent: 'center', alignItems: 'center', ...shadows.sm,
+    backgroundColor: colors.gray[100], justifyContent: 'center', alignItems: 'center', ...cardChromeSm,
   },
 
   logoContainer: { alignItems: 'center', marginBottom: spacing.xxl },
@@ -324,7 +325,7 @@ const styles = StyleSheet.create({
 
   formContainer: {
     width: '100%', backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl, padding: spacing.xl, ...shadows.lg,
+    borderRadius: borderRadius.xl, padding: spacing.xl, ...cardChromeLg,
   },
   title: { ...typography.h2, color: colors.text.primary, marginBottom: spacing.xs },
   subtitle: { ...typography.body1, color: colors.text.secondary, marginBottom: spacing.xxl, lineHeight: 24 },
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
 
   resetButton: {
     backgroundColor: colors.primary.main, padding: spacing.md, borderRadius: borderRadius.lg,
-    alignItems: 'center', marginBottom: spacing.xl, ...shadows.md,
+    alignItems: 'center', marginBottom: spacing.xl, ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   resetButtonDisabled: { opacity: 0.7 },
   resetButtonText: { color: colors.background.default, ...typography.body1, fontWeight: '600' },
@@ -383,7 +384,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.sm,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   retryButtonText: {
     ...typography.body1,

@@ -5,9 +5,10 @@ import { WebView } from 'react-native-webview';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
 import { useUserData } from '@/hooks/useUserData';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
-import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, platformStyles, moderateScale } from '@/utils/scaling';
+import { colors } from '@/constants/theme';
+import { moderateScale } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
+import { hubScreenHeader, hubHeaderA11y, hubScreenStates } from '@/utils/hubListScreenLayout';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { supabase } from '@/lib/supabase';
 import { AlertCircle, RefreshCw } from 'lucide-react-native';
@@ -103,39 +104,60 @@ export default function RxCardScreen() {
     }
   };
 
+  const headerStyle = [hubScreenHeader.bar, { paddingTop: headerPaddingTop }];
+
   if (loading || authLoading) {
-    return <LoadingIndicator />;
+    return (
+      <View style={screenChrome.container}>
+        <View style={headerStyle}>
+          <BackButton onPress={() => router.back()} />
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              RX Discount Card
+            </SmartText>
+          </View>
+        </View>
+        <View style={hubScreenStates.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.main} />
+          <SmartText variant="body1" style={hubScreenStates.loadingText}>
+            Loading your RX card...
+          </SmartText>
+        </View>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+    <View style={screenChrome.container}>
+      <View style={headerStyle}>
         <BackButton onPress={() => router.back()} />
-        <View style={styles.headerContent}>
-          <SmartText variant="h3" style={styles.headerTitle}>RX Discount Card</SmartText>
+        <View style={hubScreenHeader.content}>
+          <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+            RX Discount Card
+          </SmartText>
         </View>
       </View>
 
       {pdfLoading && (
-        <View style={styles.loadingContainer}>
+        <View style={hubScreenStates.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <SmartText variant="body2" style={styles.loadingText}>Loading your RX card...</SmartText>
+          <SmartText variant="body1" style={hubScreenStates.loadingText}>
+            Loading your RX card...
+          </SmartText>
         </View>
       )}
 
       {error && !pdfLoading && (
-        <View style={styles.errorStateContainer}>
-          <View style={styles.errorCard}>
-            <View style={styles.errorIconContainer}>
-              <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-            </View>
-            <SmartText variant="h4" style={styles.errorTitle}>Card Temporarily Unavailable</SmartText>
-            <SmartText variant="body2" style={styles.errorMessage}>{error}</SmartText>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchPDF}>
-              <RefreshCw size={moderateScale(18)} color={colors.background.default} />
-              <SmartText variant="body2" style={styles.retryButtonText}>Try Again</SmartText>
-            </TouchableOpacity>
-          </View>
+        <View style={hubScreenStates.errorContainer}>
+          <AlertCircle size={moderateScale(48)} color={colors.status.error} />
+          <SmartText variant="h3" style={hubScreenStates.errorTitle}>
+            Card Temporarily Unavailable
+          </SmartText>
+          <SmartText variant="body2" style={hubScreenStates.errorText}>{error}</SmartText>
+          <TouchableOpacity style={hubScreenStates.retryButton} onPress={fetchPDF}>
+            <RefreshCw size={moderateScale(20)} color={colors.background.default} />
+            <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Try Again</SmartText>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -172,16 +194,12 @@ export default function RxCardScreen() {
       )}
 
       {!pdfLoading && !error && !pdfUrl && (
-        <View style={styles.errorStateContainer}>
-          <View style={styles.errorCard}>
-            <View style={[styles.errorIconContainer, { backgroundColor: `${colors.gray[400]}15` }]}>
-              <AlertCircle size={moderateScale(48)} color={colors.gray[400]} />
-            </View>
-            <SmartText variant="h4" style={styles.errorTitle}>Card Temporarily Unavailable</SmartText>
-            <SmartText variant="body2" style={styles.errorMessage}>
-              Your RX card is currently unavailable. Please try again in a few moments or contact our concierge team for assistance.
-            </SmartText>
-          </View>
+        <View style={hubScreenStates.errorContainer}>
+          <AlertCircle size={moderateScale(48)} color={colors.gray[400]} />
+          <SmartText variant="h3" style={hubScreenStates.errorTitle}>Card Temporarily Unavailable</SmartText>
+          <SmartText variant="body2" style={hubScreenStates.errorText}>
+            Your RX card is currently unavailable. Please try again in a few moments or contact our concierge team for assistance.
+          </SmartText>
         </View>
       )}
     </View>
@@ -189,87 +207,6 @@ export default function RxCardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.sm,
-  },
-  headerTitle: {
-    color: colors.text.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: responsiveSize.md,
-  },
-  loadingText: {
-    color: colors.text.secondary,
-    marginTop: responsiveSize.sm,
-  },
-  errorStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    backgroundColor: colors.background.paper,
-  },
-  errorCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.xl,
-    alignItems: 'center',
-    maxWidth: 400,
-    width: '100%',
-    ...platformStyles.shadowMd,
-  },
-  errorIconContainer: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
-    backgroundColor: `${colors.status.error}15`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: responsiveSize.lg,
-  },
-  errorTitle: {
-    color: colors.text.primary,
-    marginBottom: responsiveSize.sm,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: responsiveSize.xl,
-    lineHeight: 22,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: responsiveSize.xl,
-    paddingVertical: responsiveSize.md,
-    borderRadius: borderRadius.md,
-    gap: responsiveSize.sm,
-    minWidth: 140,
-  },
-  retryButtonText: {
-    color: colors.background.default,
-    fontWeight: '600',
-  },
   pdfContainer: {
     flex: 1,
     backgroundColor: colors.background.default,

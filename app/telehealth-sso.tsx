@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Platform,
   Alert,
-  ActivityIndicator,
   TouchableOpacity,
   BackHandler,
 } from 'react-native';
@@ -15,11 +14,14 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import Constants from 'expo-constants';
 import { BackButton } from '@/components/common/BackButton';
 import { TelehealthWebView, TelehealthWebViewRef } from '@/components/telehealth/TelehealthWebView';
+import { TelehealthLoadingPanel } from '@/components/telehealth/TelehealthLoadingPanel';
+import { TELEHEALTH_LOADING } from '@/components/telehealth/telehealthLoadingCopy';
 import { useUserData } from '@/hooks/useUserData';
 import { useAuth } from '@/hooks/useAuth';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { platformStyles, cardChromeLg } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAYS = [1000, 2000, 4000];
@@ -287,10 +289,31 @@ export default function TelehealthSSOScreen() {
     return () => backHandler.remove();
   }, [ssoUrl, webViewCanGoBack, hasUnsavedFormData]);
 
+  const goBackInsideWebView = () => {
+    telehealthWebViewRef.current?.goBackInWebView();
+  };
+
   const handleBackPress = () => {
-    if (webViewCanGoBack && telehealthWebViewRef.current?.goBackInWebView) {
-      telehealthWebViewRef.current.goBackInWebView();
-      return;
+    if (webViewCanGoBack) {
+      if (hasUnsavedFormData) {
+        Alert.alert(
+          'Unsaved Changes',
+          'You have unsaved form data. Are you sure you want to go back?',
+          [
+            { text: 'Stay', style: 'cancel' },
+            {
+              text: 'Leave',
+              style: 'destructive',
+              onPress: goBackInsideWebView,
+            },
+          ],
+        );
+        return;
+      }
+      if (telehealthWebViewRef.current?.goBackInWebView) {
+        goBackInsideWebView();
+        return;
+      }
     }
 
     const message = hasUnsavedFormData
@@ -346,12 +369,27 @@ export default function TelehealthSSOScreen() {
   };
 
   if (userLoading) {
-    return <LoadingIndicator message="Loading user data..." />;
+    return (
+      <View style={screenChrome.container}>
+        <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
+          <BackButton onPress={() => router.back()} />
+          <View style={styles.headerContent}>
+            <Stethoscope size={24} color={colors.primary.main} />
+            <Text style={styles.headerTitle}>Telehealth Portal</Text>
+          </View>
+        </Animated.View>
+        <View style={styles.contentLoadingRoot}>
+          <Animated.View style={styles.loadingImmersive} entering={FadeInUp.delay(200)}>
+            <TelehealthLoadingPanel variant="immersive" subtitle={TELEHEALTH_LOADING.subtitleUser} />
+          </Animated.View>
+        </View>
+      </View>
+    );
   }
 
   if (showFuturePlanModal && planStartDate) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
           <View style={styles.headerContent}>
@@ -397,7 +435,7 @@ export default function TelehealthSSOScreen() {
 
   if (ssoUrl) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={handleBackPress} />
           <View style={styles.headerContent}>
@@ -412,6 +450,7 @@ export default function TelehealthSSOScreen() {
             url={ssoUrl}
             initialUrl={initialSsoUrl || undefined}
             memberId={userData?.member_id || ''}
+            loadingSubtitle={TELEHEALTH_LOADING.subtitleWebView}
             onNavigationStateChange={handleNavigationStateChange}
             onFormStateChange={handleFormStateChange}
             onFormSubmitSuccess={handleFormSubmitSuccess}
@@ -426,7 +465,7 @@ export default function TelehealthSSOScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
@@ -435,126 +474,124 @@ export default function TelehealthSSOScreen() {
         </View>
       </Animated.View>
 
-      <View style={styles.content}>
-        {isLoading ? (
-          <Animated.View style={styles.loadingContainer} entering={FadeInUp.delay(200)}>
-            <View style={styles.loadingCard}>
-              <ActivityIndicator size="large" color={colors.primary.main} style={styles.spinner} />
-              <Text style={styles.loadingTitle}>Connecting to Telehealth</Text>
-              <Text style={styles.loadingText}>
-                {retryMessage || "We're securely connecting you to your telehealth portal..."}
-              </Text>
-              {retryCount > 0 && (
-                <Text style={styles.retryText}>
-                  Attempt {retryCount + 1} of {MAX_RETRY_ATTEMPTS}
+      {isLoading ? (
+        <View style={styles.contentLoadingRoot}>
+          <Animated.View style={styles.loadingImmersive} entering={FadeInUp.delay(200)}>
+            <TelehealthLoadingPanel
+              variant="immersive"
+              subtitle={retryMessage || TELEHEALTH_LOADING.subtitleSso}
+              hint={
+                retryCount > 0 ? `Attempt ${retryCount + 1} of ${MAX_RETRY_ATTEMPTS}` : null
+              }
+            />
+          </Animated.View>
+        </View>
+      ) : (
+        <View style={styles.content}>
+          {showMemberNotFound ? (
+            <Animated.View style={styles.memberNotFoundContainer} entering={FadeInUp.delay(200)}>
+              <View style={styles.memberNotFoundCard}>
+                <AlertCircle size={48} color={colors.status.warning} style={styles.memberNotFoundIcon} />
+                <Text style={styles.memberNotFoundTitle}>Member Not Found</Text>
+                <Text style={styles.memberNotFoundText}>
+                  Your membership could not be found in the telehealth system. Our Concierge team can help resolve this issue.
                 </Text>
-              )}
-            </View>
-          </Animated.View>
-        ) : showMemberNotFound ? (
-          <Animated.View style={styles.memberNotFoundContainer} entering={FadeInUp.delay(200)}>
-            <View style={styles.memberNotFoundCard}>
-              <AlertCircle size={48} color={colors.status.warning} style={styles.memberNotFoundIcon} />
-              <Text style={styles.memberNotFoundTitle}>Member Not Found</Text>
-              <Text style={styles.memberNotFoundText}>
-                Your membership could not be found in the telehealth system. Our Concierge team can help resolve this issue.
-              </Text>
 
-              <TouchableOpacity
-                style={styles.conciergeButton}
-                onPress={() => router.push('/(tabs)/chat')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.conciergeButtonText}>Contact Concierge</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.conciergeButton}
+                  onPress={() => router.push('/(tabs)/chat')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.conciergeButtonText}>Contact Concierge</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => router.back()}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.backButtonText}>Go Back</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        ) : error ? (
-          <Animated.View style={styles.errorContainer} entering={FadeInUp.delay(200)}>
-            <View style={styles.errorCard}>
-              {error === 'TELEHEALTH_ACTIVATION_PENDING' ? (
-                <>
-                  <AlertCircle size={48} color={colors.status.warning} style={styles.errorIcon} />
-                  <Text style={styles.errorTitle}>Telehealth Activation Pending</Text>
-                  <Text style={styles.errorText}>
-                    Your telehealth access is still being processed. This can take some time after enrollment.
-                  </Text>
-
-                  <TouchableOpacity
-                    style={styles.conciergeButton}
-                    onPress={() => router.push('/(tabs)/chat')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.conciergeButtonText}>Contact Concierge</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.backButtonText}>Go Back</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <AlertCircle size={48} color={colors.status.error} style={styles.errorIcon} />
-                  <Text style={styles.errorTitle}>Connection Failed</Text>
-                  <Text style={styles.errorText}>{error}</Text>
-
-                  <TouchableOpacity
-                    style={styles.retryButton}
-                    onPress={handleRetry}
-                    activeOpacity={0.8}
-                  >
-                    <RefreshCw size={20} color={colors.background.default} />
-                    <Text style={styles.retryButtonText}>Try Again</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.errorActions}>
-                    <Text style={styles.helpText}>
-                      If this problem persists, please contact our Concierge team for assistance.
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => router.back()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.backButtonText}>Go Back</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          ) : error ? (
+            <Animated.View style={styles.errorContainer} entering={FadeInUp.delay(200)}>
+              <View style={styles.errorCard}>
+                {error === 'TELEHEALTH_ACTIVATION_PENDING' ? (
+                  <>
+                    <AlertCircle size={48} color={colors.status.warning} style={styles.errorIcon} />
+                    <Text style={styles.errorTitle}>Telehealth Activation Pending</Text>
+                    <Text style={styles.errorText}>
+                      Your telehealth access is still being processed. This can take some time after enrollment.
                     </Text>
-                  </View>
-                </>
-              )}
-            </View>
-          </Animated.View>
-        ) : (
-          <Animated.View style={styles.infoContainer} entering={FadeInUp.delay(200)}>
-            <View style={styles.infoCard}>
-              <ExternalLink size={48} color={colors.primary.main} style={styles.infoIcon} />
-              <Text style={styles.infoTitle}>Ready to Connect</Text>
-              <Text style={styles.infoText}>
-                Tap the button above to securely access your telehealth portal.
-              </Text>
-            </View>
-          </Animated.View>
-        )}
-      </View>
+
+                    <TouchableOpacity
+                      style={styles.conciergeButton}
+                      onPress={() => router.push('/(tabs)/chat')}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.conciergeButtonText}>Contact Concierge</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.backButton}
+                      onPress={() => router.back()}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.backButtonText}>Go Back</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={48} color={colors.status.error} style={styles.errorIcon} />
+                    <Text style={styles.errorTitle}>Connection Failed</Text>
+                    <Text style={styles.errorText}>{error}</Text>
+
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      onPress={handleRetry}
+                      activeOpacity={0.8}
+                    >
+                      <RefreshCw size={20} color={colors.background.default} />
+                      <Text style={styles.retryButtonText}>Try Again</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.errorActions}>
+                      <Text style={styles.helpText}>
+                        If this problem persists, please contact our Concierge team for assistance.
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </Animated.View>
+          ) : (
+            <Animated.View style={styles.infoContainer} entering={FadeInUp.delay(200)}>
+              <View style={styles.infoCard}>
+                <ExternalLink size={48} color={colors.primary.main} style={styles.infoIcon} />
+                <Text style={styles.infoTitle}>Ready to Connect</Text>
+                <Text style={styles.infoText}>
+                  Tap the button above to securely access your telehealth portal.
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
@@ -573,39 +610,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
-  loadingContainer: {
-    alignItems: 'center',
+  contentLoadingRoot: {
+    flex: 1,
+    minHeight: 0,
   },
-  loadingCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    ...shadows.lg,
-    maxWidth: 350,
-    width: '100%',
-  },
-  spinner: {
-    marginBottom: spacing.lg,
-  },
-  loadingTitle: {
-    ...typography.h3,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  loadingText: {
-    ...typography.body1,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  retryText: {
-    ...typography.body2,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginTop: spacing.md,
-    fontStyle: 'italic',
+  loadingImmersive: {
+    flex: 1,
   },
   memberNotFoundContainer: {
     alignItems: 'center',
@@ -615,7 +625,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
     alignItems: 'center',
-    ...shadows.lg,
+    ...cardChromeLg,
     maxWidth: 350,
     width: '100%',
   },
@@ -643,7 +653,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     width: '100%',
     alignItems: 'center',
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   conciergeButtonText: {
     ...typography.body1,
@@ -667,7 +677,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
     alignItems: 'center',
-    ...shadows.lg,
+    ...cardChromeLg,
     maxWidth: 350,
     width: '100%',
   },
@@ -698,7 +708,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.sm,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   retryButtonText: {
     ...typography.body1,
@@ -722,7 +732,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
     alignItems: 'center',
-    ...shadows.lg,
+    ...cardChromeLg,
     maxWidth: 350,
     width: '100%',
   },
@@ -752,7 +762,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
     alignItems: 'center',
-    ...shadows.lg,
+    ...cardChromeLg,
     maxWidth: 350,
     width: '100%',
   },
@@ -794,7 +804,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     width: '100%',
     alignItems: 'center',
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   scheduleButtonText: {
     ...typography.body1,

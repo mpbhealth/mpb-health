@@ -1,8 +1,7 @@
 import React from 'react';
-import { Text, TextProps, PixelRatio } from 'react-native';
+import { Text, TextProps } from 'react-native';
 import { moderateScale } from '@/utils/scaling';
-
-const fontScale = PixelRatio.getFontScale();
+import { maxFontSizeMultiplier as axMaxMultiplier } from '@/constants/accessibility';
 
 const createTypography = () => ({
   display1: {
@@ -77,8 +76,6 @@ interface SmartTextProps extends TextProps {
   maxLines?: number;
 }
 
-const SCALEABLE_VARIANTS = new Set(['body1', 'body2', 'caption']);
-
 export const SmartText: React.FC<SmartTextProps> = ({
   children,
   variant = 'body1',
@@ -90,8 +87,8 @@ export const SmartText: React.FC<SmartTextProps> = ({
 }) => {
   const typography = createTypography();
   const variantStyle = typography[variant];
-  // Respect system font size for body/caption (accessibility); headings stay fixed for layout
-  const scaleFont = allowFontScaling ?? SCALEABLE_VARIANTS.has(variant);
+  // Default: respect system text size / display zoom for every variant (opt out with allowFontScaling={false})
+  const scaleFont = allowFontScaling ?? true;
 
   const minimumFontSizes: Record<string, number> = {
     display1: 22,
@@ -112,16 +109,16 @@ export const SmartText: React.FC<SmartTextProps> = ({
   };
 
   const maxFontSizeMultipliers: Record<string, number> = {
-    display1: fontScale > 1.3 ? 1.2 : 1.3,
-    display2: fontScale > 1.3 ? 1.2 : 1.3,
-    h1: fontScale > 1.3 ? 1.25 : 1.4,
-    h2: fontScale > 1.3 ? 1.3 : 1.4,
-    h3: fontScale > 1.3 ? 1.35 : 1.5,
-    h4: fontScale > 1.3 ? 1.4 : 1.5,
-    body1: fontScale > 1.3 ? 1.4 : 1.5,
-    body2: fontScale > 1.3 ? 1.45 : 1.5,
-    caption: fontScale > 1.3 ? 1.5 : 1.6,
-    overline: fontScale > 1.3 ? 1.5 : 1.6,
+    display1: axMaxMultiplier.heading,
+    display2: axMaxMultiplier.heading,
+    h1: axMaxMultiplier.heading,
+    h2: axMaxMultiplier.heading,
+    h3: axMaxMultiplier.heading,
+    h4: axMaxMultiplier.heading,
+    body1: axMaxMultiplier.body,
+    body2: axMaxMultiplier.body,
+    caption: axMaxMultiplier.caption,
+    overline: axMaxMultiplier.heading,
   };
 
   return (

@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
   BackHandler,
   ActivityIndicator,
 } from 'react-native';
@@ -34,10 +33,18 @@ import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useLabsTesting, type LabsTestingService } from '@/hooks/useLabsTesting';
-import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { colors } from '@/constants/theme';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import {
+  hubScreenHeader,
+  hubHeaderA11y,
+  hubScreenScroll,
+  hubListRow,
+  hubScreenStates,
+} from '@/utils/hubListScreenLayout';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
+import { screenChrome } from '@/utils/screenChrome';
 import type WebView from 'react-native-webview';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -84,34 +91,34 @@ function AnimatedServiceCard({
   const ServiceIcon = service.icon;
 
   return (
-    <AnimatedTouchableOpacity
-      style={[styles.serviceCard, animatedStyle]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      entering={FadeInUp.delay(300 + index * 100)}
-      layout={Layout.springify()}
-      activeOpacity={0.9}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${service.title}`}
-    >
-      <View style={styles.serviceContent}>
-        <View style={[styles.iconContainer, { backgroundColor: service.gradient }]}>
-          <ServiceIcon size={moderateScale(24)} color={service.color} />
+    <Animated.View entering={FadeInUp.delay(300 + index * 100)} layout={Layout.springify()}>
+      <AnimatedTouchableOpacity
+        style={[hubListRow.card, animatedStyle]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${service.title}`}
+      >
+        <View style={hubListRow.rowInner}>
+          <View style={[hubListRow.iconTile, { backgroundColor: service.gradient }]}>
+            <ServiceIcon size={moderateScale(22)} color={service.color} />
+          </View>
+          <View style={hubListRow.textBlock}>
+            <SmartText variant="body1" style={hubListRow.rowTitle}>
+              {service.title}
+            </SmartText>
+            <SmartText variant="body2" style={hubListRow.rowDescription}>
+              {service.description}
+            </SmartText>
+          </View>
         </View>
-        <View style={styles.textContainer}>
-          <SmartText variant="body1" style={styles.serviceTitle}>
-            {service.title}
-          </SmartText>
-          <SmartText variant="body2" style={styles.serviceDescription}>
-            {service.description}
-          </SmartText>
+        <View style={[hubListRow.openHint, { borderWidth: 0, backgroundColor: service.gradient }]}>
+          <ExternalLink size={moderateScale(18)} color={service.color} />
         </View>
-      </View>
-      <View style={[styles.chevronContainer, { backgroundColor: service.gradient }]}>
-        <ExternalLink size={moderateScale(18)} color={service.color} />
-      </View>
-    </AnimatedTouchableOpacity>
+      </AnimatedTouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -121,7 +128,7 @@ export default function LabsTestingScreen() {
   const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
   const { services, loading, error, refetch } = useLabsTesting();
   const { isTablet } = useResponsive();
-  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
+  const headerStyle = [hubScreenHeader.bar, { paddingTop: headerPaddingTop }];
 
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
 
@@ -172,15 +179,17 @@ export default function LabsTestingScreen() {
 
   if (selectedUrl) {
     return (
-      <Animated.View style={styles.container} entering={SlideInRight} exiting={SlideOutLeft}>
+      <Animated.View style={screenChrome.container} entering={SlideInRight} exiting={SlideOutLeft}>
         <View style={headerStyle}>
           <BackButton
             onPress={() => {
               if (!handleBackWithinWebView()) router.back();
             }}
           />
-          <View style={styles.headerContent}>
-            <SmartText variant="h3" style={styles.headerTitle}>RX & Diagnostics</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h3" style={hubScreenHeader.detailTitle} {...hubHeaderA11y.detailTitle}>
+              RX & Diagnostics
+            </SmartText>
           </View>
         </View>
 
@@ -197,14 +206,18 @@ export default function LabsTestingScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              RX & Diagnostics
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.loadingContainer}>
+        <View style={hubScreenStates.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <SmartText variant="body1" style={styles.loadingText}>Loading services...</SmartText>
+          <SmartText variant="body1" style={hubScreenStates.loadingText}>Loading services...</SmartText>
         </View>
       </View>
     );
@@ -212,18 +225,22 @@ export default function LabsTestingScreen() {
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              RX & Diagnostics
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.errorContainer}>
+        <View style={hubScreenStates.errorContainer}>
           <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Services</SmartText>
-          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
-          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
+          <SmartText variant="h3" style={hubScreenStates.errorTitle}>Unable to Load Services</SmartText>
+          <SmartText variant="body2" style={hubScreenStates.errorText}>{error}</SmartText>
+          <TouchableOpacity style={hubScreenStates.retryButton} onPress={refetch}>
             <RefreshCw size={moderateScale(20)} color={colors.background.default} />
-            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
+            <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -232,10 +249,14 @@ export default function LabsTestingScreen() {
 
   if (services.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              RX & Diagnostics
+            </SmartText>
+          </View>
         </Animated.View>
         <EmptyState
           icon={<FlaskConical size={moderateScale(48)} color={colors.gray[300]} />}
@@ -248,27 +269,32 @@ export default function LabsTestingScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>RX & Diagnostics</SmartText>
+        <View style={hubScreenHeader.content}>
+          <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+            RX & Diagnostics
+          </SmartText>
+        </View>
       </Animated.View>
 
       <ScrollView
-        style={styles.content}
+        style={[hubScreenScroll.content, hubScreenScroll.contentShade]}
         overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, hubScreenScroll.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xl }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[hubScreenScroll.maxWidthContainer, isTablet && hubScreenScroll.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
-            <SmartText variant="body1" style={styles.description}>
+            <SmartText variant="body1" style={hubScreenScroll.description}>
               Access affordable laboratory testing and imaging services through our trusted partners.
               Compare prices, find convenient locations, and schedule your appointments with ease.
             </SmartText>
           </Animated.View>
 
-          <View style={styles.servicesGrid}>
+          <View style={hubScreenScroll.listGap}>
             {services.map((service, index) => (
               <AnimatedServiceCard
                 key={service.id}
@@ -299,107 +325,6 @@ export default function LabsTestingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper
-  },
-
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
-    minWidth: 0,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  title: {
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-  },
-
-  content: {
-    flex: 1
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
-  },
-  tabletMaxWidth: {
-    maxWidth: 900,
-  },
-
-  description: {
-    color: colors.text.secondary,
-    marginBottom: responsiveSize.lg,
-  },
-
-  servicesGrid: {
-    gap: responsiveSize.md,
-    marginBottom: responsiveSize.lg
-  },
-
-  serviceCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
-  },
-  serviceContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    minWidth: 0,
-  },
-
-  iconContainer: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    flexShrink: 0,
-  },
-  textContainer: {
-    flex: 1,
-    minWidth: 0,
-    gap: responsiveSize.xs / 4,
-  },
-  serviceTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  serviceDescription: {
-    color: colors.text.secondary,
-  },
-
-  chevronContainer: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-
   warningCard: {
     backgroundColor: rgbaFromHex(colors.status.warning, 0.08),
     borderColor: rgbaFromHex(colors.status.warning, 0.2),
@@ -407,7 +332,7 @@ const styles = StyleSheet.create({
   },
   warningHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: responsiveSize.sm,
     gap: responsiveSize.sm,
   },
@@ -418,47 +343,6 @@ const styles = StyleSheet.create({
   },
   warningText: {
     color: colors.status.warning,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  loadingText: {
-    color: colors.text.secondary,
-  },
-
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  errorTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  errorText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: responsiveSize.lg,
-    paddingVertical: responsiveSize.sm,
-    borderRadius: borderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: responsiveSize.xs,
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
-  },
-  retryButtonText: {
-    fontWeight: '600',
-    color: colors.background.default,
+    lineHeight: 20,
   },
 });

@@ -3,7 +3,8 @@ import { View, ActivityIndicator, StyleSheet, Platform, TouchableOpacity } from 
 import WebView from 'react-native-webview';
 import { SmartText } from '@/components/common/SmartText';
 import { borderRadius, colors } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, cardChromeShadow } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { RefreshCw, AlertCircle } from 'lucide-react-native';
 
 type Props = { url: string; email?: string | null };
@@ -235,7 +236,7 @@ true;
   `;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={screenChrome.container}>
       <WebView
         ref={webRef}
         source={{ uri: url }}
@@ -316,7 +317,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: responsiveSize.md,
     borderRadius: borderRadius.lg,
     gap: responsiveSize.sm,
-    ...platformStyles.shadow,
+    ...cardChromeShadow,
   },
   statusText: {
     color: colors.text.secondary,
@@ -340,7 +341,7 @@ const styles = StyleSheet.create({
     gap: responsiveSize.md,
     maxWidth: moderateScale(400),
     width: '100%',
-    ...platformStyles.shadow,
+    ...cardChromeShadow,
   },
   errorTitle: {
     color: colors.text.primary,

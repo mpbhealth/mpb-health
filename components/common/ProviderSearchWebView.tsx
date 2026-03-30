@@ -8,6 +8,7 @@ import React, { useRef, useCallback } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import WebView from 'react-native-webview';
 import { colors } from '@/constants/theme';
+import { screenChrome } from '@/utils/screenChrome';
 
 const MULTIPLAN_PROVIDER_SEARCH_ORIGIN = 'https://providersearch.multiplan.com';
 
@@ -126,7 +127,7 @@ export function ProviderSearchWebView({ url }: ProviderSearchWebViewProps) {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <WebView
         ref={webRef}
         source={{ uri: url }}
@@ -160,10 +161,6 @@ export function isMultiplanProviderSearchUrl(url: string): boolean {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.default,
-  },
   webview: {
     flex: 1,
     backgroundColor: colors.background.default,

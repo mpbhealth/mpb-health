@@ -13,6 +13,17 @@ import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { supabase } from '@/lib/supabase';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles, MIN_TOUCH_TARGET } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
+
+type DependentRow = {
+  member_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  product_label: string | null;
+  product_benefit: string | null;
+  relationship: string | null;
+  dob?: string | null;
+};
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -103,7 +114,7 @@ export default function PlanDetailsScreen() {
 
         // Merge by member_id: prefer users (activated) over members (inactive)
         const mergedMap = new Map<string, Dependent>();
-        const toDependent = (dep: { member_id: string; first_name: string | null; last_name: string | null; product_label: string | null; product_benefit: string | null; relationship: string | null; dob?: string | null }) => ({
+        const toDependent = (dep: DependentRow) => ({
           id: dep.member_id,
           member_id: dep.member_id,
           first_name: dep.first_name ?? '',
@@ -114,10 +125,10 @@ export default function PlanDetailsScreen() {
           dob: dep.dob ?? null,
         });
 
-        (membersResult.data || []).forEach((dep) => {
+        (membersResult.data || []).forEach((dep: DependentRow) => {
           mergedMap.set(dep.member_id, toDependent(dep));
         });
-        (usersResult.data || []).forEach((dep) => {
+        (usersResult.data || []).forEach((dep: DependentRow) => {
           mergedMap.set(dep.member_id, toDependent(dep));
         });
 
@@ -174,7 +185,7 @@ export default function PlanDetailsScreen() {
 
   if (showHandbook) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <TouchableOpacity
             onPress={() => setShowHandbook(false)}
@@ -193,7 +204,7 @@ export default function PlanDetailsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
         <BackButton onPress={() => router.back()} />
         <View style={styles.headerContent}>
@@ -204,7 +215,7 @@ export default function PlanDetailsScreen() {
       <ScrollView
         style={styles.scroll}
         overScrollMode="never"
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, styles.scrollContentExtra, { paddingBottom: scrollContentPaddingBottom }]}
         showsVerticalScrollIndicator={false}
       >
         {primaryInfo && (
@@ -370,17 +381,14 @@ export default function PlanDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: responsiveSize.lg,
+    paddingHorizontal: responsiveSize.lg,
+    paddingBottom: responsiveSize.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
@@ -394,8 +402,7 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
-  scrollContent: {
-    padding: responsiveSize.lg,
+  scrollContentExtra: {
     paddingBottom: responsiveSize.xl * 2,
   },
   card: {
@@ -450,8 +457,8 @@ const styles = StyleSheet.create({
     gap: responsiveSize.md,
   },
   dependentRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
   },
   dependentAvatar: {
     width: moderateScale(36),
@@ -481,7 +488,8 @@ const styles = StyleSheet.create({
     padding: responsiveSize.lg,
     minHeight: MIN_TOUCH_TARGET,
     marginBottom: responsiveSize.lg,
-    ...platformStyles.shadow,
+    elevation: 0,
+    ...(Platform.OS === 'ios' ? platformStyles.shadow : {}),
   },
   buttonContent: {
     flexDirection: 'row',

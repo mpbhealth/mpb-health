@@ -21,13 +21,13 @@ import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/lib/supabase';
 import {
   colors,
-  shadows,
   typography,
   spacing,
   borderRadius,
 } from '@/constants/theme';
 import { normalize, getLineHeight } from '@/utils/responsive';
-import { moderateScale, platformStyles } from '@/utils/scaling';
+import { moderateScale, platformStyles, cardChromeMd } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 const logoImg = require('../assets/images/logo.png');
 
@@ -183,7 +183,7 @@ export default function NotificationDetailScreen() {
 
   if (!notificationId) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <BackButton onPress={goBack} />
           <SmartText variant="h2" style={styles.headerTitle}>Notification</SmartText>
@@ -199,7 +199,7 @@ export default function NotificationDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <BackButton onPress={goBack} />
           <SmartText variant="h2" style={styles.headerTitle}>Notification</SmartText>
@@ -214,7 +214,7 @@ export default function NotificationDetailScreen() {
 
   if (fetchError || !notification) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
           <BackButton onPress={goBack} />
           <SmartText variant="h2" style={styles.headerTitle}>Notification</SmartText>
@@ -235,7 +235,7 @@ export default function NotificationDetailScreen() {
   const firstName = userData?.first_name || 'Member';
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       {/* Header */}
       <Animated.View
         entering={FadeInDown.delay(100)}
@@ -551,19 +551,14 @@ export default function NotificationDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.subtle ?? colors.gray[50],
-  },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     backgroundColor: colors.background.default,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerTitle: {
@@ -597,7 +592,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     backgroundColor: colors.background.default,
     overflow: 'hidden',
-    ...shadows.md,
+    ...cardChromeMd,
   },
 
   accentBar: {
@@ -796,7 +791,7 @@ const pdStyles = StyleSheet.create({
     paddingVertical: spacing.md + 2,
     borderRadius: borderRadius.lg,
     gap: spacing.sm,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   ctaButtonText: {
     fontSize: normalize(16),

@@ -14,6 +14,8 @@ export interface TelehealthWebViewProps {
   onFormSubmitSuccess?: () => void;
   onSessionExpired?: () => void;
   headers?: Record<string, string>;
+  /** Message under the title while the WebView loads the first page (defaults to shared telehealth copy). */
+  loadingSubtitle?: string;
 }
 
 export interface FormState {

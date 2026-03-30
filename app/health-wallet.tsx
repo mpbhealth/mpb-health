@@ -8,9 +8,10 @@ import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 export default function HealthWalletScreen() {
   const router = useRouter();
@@ -80,7 +81,7 @@ export default function HealthWalletScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View 
         style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
@@ -100,6 +101,7 @@ export default function HealthWalletScreen() {
           javaScriptEnabled={true}
           domStorageEnabled={true}
           highSecurity
+          enhancementPreset="portal"
         />
       </View>
     </View>
@@ -107,18 +109,14 @@ export default function HealthWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.default,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingBottom: spacing.md,
     backgroundColor: colors.background.default,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   titleContainer: {

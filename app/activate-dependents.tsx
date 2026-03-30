@@ -17,8 +17,9 @@ import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { useUserData } from '@/hooks/useUserData';
 import { supabase } from '@/lib/supabase';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, platformStyles, cardChromeMd } from '@/utils/scaling';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { screenChrome } from '@/utils/screenChrome';
 
 interface InactiveDependent {
   member_id: string;
@@ -162,7 +163,7 @@ export default function ActivateDependentsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={[styles.header, { paddingTop: headerPaddingTop }]} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <SmartText variant="h2" style={styles.title} maxLines={1}>Create App Login</SmartText>
@@ -172,7 +173,7 @@ export default function ActivateDependentsScreen() {
         style={styles.content}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, styles.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xxl }]}
       >
         <Animated.View style={styles.introCard} entering={FadeInUp.delay(200)}>
           <Users size={moderateScale(24)} color={colors.primary.main} />
@@ -305,16 +306,15 @@ export default function ActivateDependentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: responsiveSize.lg,
+    paddingHorizontal: responsiveSize.lg,
+    paddingBottom: responsiveSize.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: responsiveSize.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
@@ -325,9 +325,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  scrollContent: {
-    padding: responsiveSize.lg,
-    paddingBottom: responsiveSize.xxl,
+  scrollPad: {
+    paddingHorizontal: responsiveSize.lg,
   },
   introCard: {
     backgroundColor: colors.background.default,
@@ -337,7 +336,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: responsiveSize.md,
-    ...platformStyles.shadowMd,
+    ...cardChromeMd,
   },
   introContent: {
     flex: 1,
@@ -370,7 +369,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...platformStyles.shadowMd,
+    ...cardChromeMd,
   },
   dependentCardDisabled: {
     opacity: 0.6,

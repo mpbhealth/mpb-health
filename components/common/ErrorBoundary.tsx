@@ -1,7 +1,8 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { AlertCircle, RefreshCw } from 'lucide-react-native';
-import { colors, spacing, typography, borderRadius, shadows } from '@/constants/theme';
+import { colors, spacing, typography, borderRadius } from '@/constants/theme';
+import { cardChromeSm, platformStyles } from '@/utils/scaling';
 import { logger } from '@/lib/logger';
 
 interface ErrorBoundaryProps {
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginBottom: spacing.lg,
     width: '100%',
-    ...shadows.sm,
+    ...cardChromeSm,
   },
   errorTitle: {
     ...typography.body2,
@@ -135,7 +136,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   buttonText: {
     ...typography.body1,

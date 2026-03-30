@@ -1,11 +1,13 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   Platform,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -24,7 +26,7 @@ import { signOutUser } from '@/lib/auth';
 import { useUserData } from '@/hooks/useUserData';
 import { colors, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { useTabScreenSafePadding } from '@/hooks/useSafeHeaderPadding';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
 import { PaymentDisclaimerModal } from '@/components/modals/PaymentDisclaimerModal';
@@ -52,8 +54,14 @@ export default function ProfileScreen() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showPaymentDisclaimerModal, setShowPaymentDisclaimerModal] = useState(false);
   const insets = useSafeAreaInsets();
-  const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useTabScreenSafePadding();
+  const { width: screenWidth } = useWindowDimensions();
   const { isTablet } = useResponsive();
+
+  const contentPaddingHorizontal = useMemo(
+    () => (screenWidth <= 320 ? moderateScale(14) : moderateScale(20)),
+    [screenWidth]
+  );
 
   const initials = useMemo(
     () => getInitials(userData?.first_name, userData?.last_name),
@@ -95,19 +103,35 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View style={styles.container}>
       <Animated.View
         entering={FadeInDown.delay(80)}
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
+        style={[
+          styles.header,
+          { paddingTop: headerPaddingTop, paddingHorizontal: contentPaddingHorizontal },
+        ]}
       >
-        <SmartText variant="h2" style={styles.title}>My Profile</SmartText>
+        <View style={[styles.headerInner, isTablet && styles.headerInnerTablet]}>
+          <SmartText variant="overline" style={styles.headerOverline}>
+            Account
+          </SmartText>
+          <SmartText variant="h2" style={styles.title}>
+            My Profile
+          </SmartText>
+        </View>
       </Animated.View>
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: contentPaddingHorizontal,
+            paddingBottom: scrollContentPaddingBottom,
+          },
+        ]}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
           <Animated.View entering={FadeInDown.delay(160)}>
@@ -144,18 +168,32 @@ export default function ProfileScreen() {
           </Animated.View>
 
           {menuSections.map((sec, sIdx) => (
-            <Animated.View key={sec.title} entering={FadeInUp.delay(220 + sIdx * 80)} layout={Layout.springify()} style={styles.section}>
-              <SmartText variant="caption" style={styles.sectionTitle}>{sec.title}</SmartText>
+            <Animated.View
+              key={sec.title}
+              entering={FadeInUp.delay(220 + sIdx * 80)}
+              layout={Platform.OS === 'ios' ? Layout.springify() : undefined}
+              style={styles.section}
+            >
+              <SmartText variant="overline" style={styles.sectionTitle}>
+                {sec.title}
+              </SmartText>
 
               <Card padding="none" variant="elevated" style={styles.cardList}>
                 {sec.items.map((item, idx) => (
                   <Animated.View
                     key={item.title}
                     entering={FadeInUp.delay(260 + idx * 50)}
-                    layout={Layout.springify()}
+                    layout={Platform.OS === 'ios' ? Layout.springify() : undefined}
                   >
-                    <TouchableOpacity
-                      style={[styles.menuItem, idx !== sec.items.length - 1 && styles.menuItemDivider]}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.menuItem,
+                        idx !== sec.items.length - 1 && styles.menuItemDivider,
+                        Platform.OS === 'ios' && pressed && styles.menuItemPressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.title}
+                      accessibilityState={{ disabled: loading }}
                       onPress={() => {
                         if (item.route === '/payment-history') {
                           setShowPaymentDisclaimerModal(true);
@@ -164,7 +202,7 @@ export default function ProfileScreen() {
                         }
                       }}
                       disabled={loading}
-                      activeOpacity={0.85}
+                      android_ripple={{ color: `${colors.primary.main}12` }}
                     >
                       <View style={styles.menuLeft}>
                         <View style={[styles.iconContainer, { backgroundColor: rgbaFromHex(item.color, 0.12) }]}>
@@ -182,24 +220,26 @@ export default function ProfileScreen() {
                       </View>
 
                       <ChevronRight size={moderateScale(18)} color={colors.gray[400]} />
-                    </TouchableOpacity>
+                    </Pressable>
                   </Animated.View>
                 ))}
               </Card>
             </Animated.View>
           ))}
 
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => setShowLogoutConfirm(true)}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            <LogOut size={moderateScale(20)} color={colors.status.error} />
-            <SmartText variant="body1" style={styles.logoutText}>Log Out</SmartText>
-          </TouchableOpacity>
+          <View style={styles.logoutSection}>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={() => setShowLogoutConfirm(true)}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <LogOut size={moderateScale(20)} color={colors.status.error} />
+              <SmartText variant="body1" style={styles.logoutText}>Log Out</SmartText>
+            </TouchableOpacity>
 
-          <SmartText variant="caption" style={styles.version}>Version 1.0.0</SmartText>
+            <SmartText variant="caption" style={styles.version}>Version 1.0.0</SmartText>
+          </View>
         </View>
       </ScrollView>
 
@@ -246,22 +286,34 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: colors.background.default,
-    paddingHorizontal: responsiveSize.md,
     paddingBottom: responsiveSize.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
+    zIndex: 2,
+  },
+  headerInner: {
+    width: '100%',
+  },
+  headerInnerTablet: {
+    maxWidth: 1200,
+    alignSelf: 'center',
+  },
+  headerOverline: {
+    color: colors.primary.main,
+    marginBottom: responsiveSize.xs,
+    opacity: 0.9,
   },
   title: {
     color: colors.text.primary,
-    fontWeight: '700'
+    fontWeight: '700',
   },
 
   content: {
     flex: 1
   },
   scrollContent: {
-    padding: responsiveSize.md
+    paddingTop: responsiveSize.md,
   },
 
   maxWidthContainer: {
@@ -276,14 +328,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: responsiveSize.lg,
+    borderRadius: borderRadius.xl,
   },
   avatarContainer: {
     marginRight: responsiveSize.md,
   },
   avatar: {
-    width: moderateScale(64),
-    height: moderateScale(64),
-    borderRadius: moderateScale(32),
+    width: moderateScale(68),
+    height: moderateScale(68),
+    borderRadius: borderRadius.full,
     backgroundColor: rgbaFromHex(colors.primary.main, 0.15),
     justifyContent: 'center',
     alignItems: 'center',
@@ -321,18 +374,33 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    marginBottom: responsiveSize.lg
+    marginBottom: responsiveSize.lg,
+  },
+  /**
+   * Android: own stack + opaque paper behind logout so list cards / outlines never paint on top
+   * of the sign-out control (elevation / layout compositing).
+   */
+  logoutSection: {
+    marginTop: responsiveSize.sm,
+    paddingTop: responsiveSize.md,
+    paddingBottom: responsiveSize.xs,
+    backgroundColor: colors.background.paper,
+    ...(Platform.OS === 'android'
+      ? {
+          zIndex: 2,
+          elevation: 0,
+        }
+      : {}),
   },
   sectionTitle: {
-    fontWeight: '700',
-    color: colors.text.secondary,
+    color: colors.primary.main,
     marginBottom: responsiveSize.sm,
-    textTransform: 'uppercase',
+    opacity: 0.95,
   },
 
   cardList: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     overflow: 'hidden',
   },
 
@@ -341,13 +409,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: responsiveSize.md,
-    paddingVertical: responsiveSize.sm,
+    paddingVertical: responsiveSize.md,
     backgroundColor: colors.background.default,
-    minHeight: MIN_TOUCH_TARGET,
+    minHeight: MIN_TOUCH_TARGET + 6,
   },
   menuItemDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100]
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[100],
+  },
+  menuItemPressed: {
+    opacity: 0.92,
   },
   menuLeft: {
     flexDirection: 'row',
@@ -357,9 +428,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   iconContainer: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: borderRadius.md,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: responsiveSize.sm,
@@ -384,12 +455,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: rgbaFromHex(colors.status.error, 0.08),
     paddingHorizontal: responsiveSize.lg,
-    paddingVertical: responsiveSize.sm,
-    borderRadius: borderRadius.lg,
-    marginTop: responsiveSize.md,
+    paddingVertical: responsiveSize.md,
+    borderRadius: borderRadius.full,
     minHeight: MIN_TOUCH_TARGET,
     gap: responsiveSize.xs,
-    ...platformStyles.shadowSm,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
+    ...(Platform.OS === 'android'
+      ? {
+          elevation: 0,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: rgbaFromHex(colors.status.error, 0.28),
+        }
+      : {}),
   },
   logoutText: {
     fontWeight: '700',
@@ -398,7 +475,7 @@ const styles = StyleSheet.create({
   version: {
     textAlign: 'center',
     color: colors.text.secondary,
-    marginTop: responsiveSize.lg,
+    marginTop: responsiveSize.md,
   },
 
   modalOverlay: {

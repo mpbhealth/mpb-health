@@ -18,7 +18,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeLg, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 type VerificationMethod = 'memberId' | 'emailDob';
 
@@ -613,7 +615,7 @@ export default function VerifyMembershipScreen() {
   // ---------- UI ----------
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[screenChrome.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
@@ -623,22 +625,22 @@ export default function VerifyMembershipScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInDown.delay(120)} style={styles.card}>
-          <Text style={styles.title} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Create App Login</Text>
-          <Text style={styles.subtitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">
+          <Text style={styles.title}>Create App Login</Text>
+          <Text style={styles.subtitle}>
             Verify your membership to set up your app login.
           </Text>
 
           {!!notice && !error && (
             <View style={styles.noticeContainer}>
-              <Text style={styles.noticeText} allowFontScaling={false}>{notice}</Text>
+              <Text style={styles.noticeText}>{notice}</Text>
             </View>
           )}
           {!!error && (
             <View style={styles.errorContainer} accessibilityLiveRegion="polite">
               <AlertCircle size={20} color={colors.status.error} style={styles.errorIcon} />
-              <Text style={styles.errorText} allowFontScaling={false} numberOfLines={3} ellipsizeMode="tail">{error}</Text>
+              <Text style={styles.errorText}>{error}</Text>
               {locked && (
-                <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
+                <Text style={styles.helperText}>
                   Locked due to too many attempts. Try again in {secondsLeft}s.
                 </Text>
               )}
@@ -648,15 +650,15 @@ export default function VerifyMembershipScreen() {
           {showEmailInput ? (
             <>
               <View style={styles.dependentInfoCard}>
-                <Text style={styles.dependentInfoTitle} allowFontScaling={false}>Almost there!</Text>
-                <Text style={styles.dependentInfoText} allowFontScaling={false}>
+                <Text style={styles.dependentInfoTitle}>Almost there!</Text>
+                <Text style={styles.dependentInfoText}>
                   We found the membership for {dependentMember?.first_name} {dependentMember?.last_name}.{"\n"}
                   Add an email to use for your app login.
                 </Text>
               </View>
 
               <View style={styles.inputContainer}>
-                <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Email Address</Text>
+                <Text style={styles.label}>Email Address</Text>
                 <TextInput
                   style={[styles.input, error ? styles.inputError : null]}
                   value={dependentEmail}
@@ -672,7 +674,7 @@ export default function VerifyMembershipScreen() {
                   accessibilityLabel="Dependent email address"
                   placeholderTextColor={colors.text.secondary}
                 />
-                <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">This will be your login email for the app</Text>
+                <Text style={styles.helperText}>This will be your login email for the app</Text>
               </View>
 
               <TouchableOpacity
@@ -680,7 +682,7 @@ export default function VerifyMembershipScreen() {
                 onPress={handleAddDependentEmail}
                 disabled={isLoading || locked}
               >
-                <Text style={styles.verifyButtonText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
+                <Text style={styles.verifyButtonText}>
                   {isLoading ? 'Adding Email...' : 'Continue with Email'}
                 </Text>
               </TouchableOpacity>
@@ -695,7 +697,7 @@ export default function VerifyMembershipScreen() {
                   setNotice(null);
                 }}
               >
-                <Text style={styles.backButtonText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">← Back</Text>
+                <Text style={styles.backButtonText}>← Back</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -725,9 +727,6 @@ export default function VerifyMembershipScreen() {
                       styles.toggleButtonText,
                       verificationMethod === 'memberId' && styles.toggleButtonTextActive,
                     ]}
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
                   >
                     Member ID
                   </Text>
@@ -755,9 +754,6 @@ export default function VerifyMembershipScreen() {
                       styles.toggleButtonText,
                       verificationMethod === 'emailDob' && styles.toggleButtonTextActive,
                     ]}
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
                   >
                     Email & DOB
                   </Text>
@@ -767,7 +763,7 @@ export default function VerifyMembershipScreen() {
               {/* Member ID */}
               {verificationMethod === 'memberId' && (
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Member ID</Text>
+                  <Text style={styles.label}>Member ID</Text>
                   <TextInput
                     style={[styles.input, error ? styles.inputError : null]}
                     value={memberId}
@@ -789,7 +785,7 @@ export default function VerifyMembershipScreen() {
               {verificationMethod === 'emailDob' && (
                 <>
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Email Address</Text>
+                    <Text style={styles.label}>Email Address</Text>
                     <TextInput
                       style={[styles.input, error ? styles.inputError : null]}
                       value={email}
@@ -806,11 +802,11 @@ export default function VerifyMembershipScreen() {
                       accessibilityLabel="Email address"
                       placeholderTextColor={colors.text.secondary}
                     />
-                    <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">We'll use this for your login.</Text>
+                    <Text style={styles.helperText}>We'll use this for your login.</Text>
                   </View>
 
                   <View style={styles.inputContainer}>
-                    <Text style={styles.label} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Date of Birth</Text>
+                    <Text style={styles.label}>Date of Birth</Text>
                     <View style={[styles.dateInputContainer, error ? styles.inputError : null]}>
                       <TextInput
                         style={styles.dateInput}
@@ -826,7 +822,7 @@ export default function VerifyMembershipScreen() {
                         <Calendar size={20} color={colors.primary.main} />
                       </TouchableOpacity>
                     </View>
-                    <Text style={styles.helperText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Enter manually or tap the calendar</Text>
+                    <Text style={styles.helperText}>Enter manually or tap the calendar</Text>
                   </View>
 
                   {showDatePicker && Platform.OS === 'android' && (
@@ -849,9 +845,9 @@ export default function VerifyMembershipScreen() {
                       <Pressable style={styles.modalBackdrop} onPress={() => setShowDatePicker(false)} />
                       <View style={styles.pickerSheet}>
                         <View style={styles.pickerHeader}>
-                          <Text style={styles.pickerTitle} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Select Date of Birth</Text>
+                          <Text style={styles.pickerTitle}>Select Date of Birth</Text>
                           <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.pickerDoneBtn}>
-                            <Text style={styles.pickerDoneText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Done</Text>
+                            <Text style={styles.pickerDoneText}>Done</Text>
                           </TouchableOpacity>
                         </View>
                         <DateTimePicker
@@ -877,7 +873,7 @@ export default function VerifyMembershipScreen() {
                 onPress={handleVerifyMembership}
                 disabled={isLoading || locked}
               >
-                <Text style={styles.verifyButtonText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
+                <Text style={styles.verifyButtonText}>
                   {isLoading ? 'Verifying...' : 'Continue'}
                 </Text>
               </TouchableOpacity>
@@ -887,10 +883,10 @@ export default function VerifyMembershipScreen() {
           {!showEmailInput && (
             <>
               <TouchableOpacity style={styles.supportContainer} onPress={() => router.push('/auth/member-support')}>
-                <Text style={styles.supportText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Need help? Contact our Concierge team</Text>
+                <Text style={styles.supportText}>Need help? Contact our Concierge team</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.signInContainer} onPress={() => router.push('/auth/sign-in')}>
-                <Text style={styles.signInText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
+                <Text style={styles.signInText}>
                   Already created a login? <Text style={styles.signInLink}>Sign In</Text>
                 </Text>
               </TouchableOpacity>
@@ -903,7 +899,6 @@ export default function VerifyMembershipScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.default },
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },
   card: {
     width: '100%',
@@ -912,9 +907,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
-    ...shadows.lg,
-    borderWidth: 1,
-    borderColor: colors.gray[100],
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[200],
+    ...cardChromeLg,
   },
   title: { ...typography.h2, fontWeight: '700' as const, color: colors.text.primary, textAlign: 'center' as const, marginBottom: spacing.sm, flexShrink: 1 },
   subtitle: { ...typography.body1, color: colors.text.secondary, textAlign: 'center' as const, lineHeight: 22, marginBottom: spacing.xl, flexShrink: 1 },
@@ -930,7 +925,7 @@ const styles = StyleSheet.create({
   toggleButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: borderRadius.md, gap: spacing.xs },
   toggleButtonLeft: { marginRight: spacing.xs / 2 },
   toggleButtonRight: { marginLeft: spacing.xs / 2 },
-  toggleButtonActive: { backgroundColor: colors.primary.main, ...shadows.sm },
+  toggleButtonActive: { backgroundColor: colors.primary.main, ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}) },
   toggleButtonText: { ...typography.body2, fontWeight: '600' as const, color: colors.text.secondary, flexShrink: 1 },
   toggleButtonTextActive: { color: colors.background.default },
 
@@ -949,7 +944,7 @@ const styles = StyleSheet.create({
 
   helperText: { ...typography.caption, color: colors.text.secondary, marginTop: spacing.xs, flexShrink: 1 },
 
-  verifyButton: { backgroundColor: colors.primary.main, paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center' as const, marginBottom: spacing.xl, ...shadows.md },
+  verifyButton: { backgroundColor: colors.primary.main, paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center' as const, marginBottom: spacing.xl, ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}) },
   buttonDisabled: { opacity: 0.6 },
   verifyButtonText: { ...typography.body1, fontWeight: '700' as const, color: colors.background.default, flexShrink: 1 },
 

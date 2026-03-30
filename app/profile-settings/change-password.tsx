@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { screenChrome } from '@/utils/screenChrome';
 import { useResponsive } from '@/hooks/useResponsive';
 
 function rgbaFromHex(hex: string, alpha: number) {
@@ -89,7 +90,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={screenChrome.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Animated.View
@@ -104,7 +105,7 @@ export default function ChangePasswordScreen() {
         style={styles.content}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, styles.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xl }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
@@ -273,15 +274,14 @@ export default function ChangePasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
+    paddingHorizontal: responsiveSize.md,
+    paddingBottom: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   title: {
@@ -294,9 +294,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
+  scrollPad: {
+    paddingHorizontal: responsiveSize.md,
   },
 
   maxWidthContainer: {
@@ -427,7 +426,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     alignItems: 'center',
     minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
+    elevation: 0,
+    ...(Platform.OS === 'ios' ? platformStyles.shadow : {}),
   },
   updateButtonDisabled: {
     opacity: 0.7,

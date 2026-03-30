@@ -1,15 +1,15 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   Platform,
   RefreshControl,
   Modal,
-  Image,
   useWindowDimensions,
-  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -35,22 +35,32 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { maxFontSizeMultiplier } from '@/constants/accessibility';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
 import { colors, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles, cardChromeSm } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTabScreenSafePadding } from '@/hooks/useSafeHeaderPadding';
+import { screenChrome } from '@/utils/screenChrome';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useFocusEffect } from 'expo-router';
+import { TelehealthDisclaimerModal } from '@/components/modals/TelehealthDisclaimerModal';
 
 const logoImg = require('../../assets/images/logo.png');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-const TELE_DERM_DISCLAIMER =
-  'Telehealth includes Urgent Care, Primary Care, Mental Health, and Pet Telehealth. Your dermatology benefit includes 3 free visits per family, per year. After that there is a $60 consultation fee.';
+function triggerLightHaptic() {
+  try {
+    const Haptics = require('expo-haptics');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch {
+    /* optional */
+  }
+}
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -59,6 +69,14 @@ function rgbaFromHex(hex: string, alpha: number) {
   const g = (int >> 8) & 0xff;
   const b = int & 0xff;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Morning / afternoon / evening from the device’s local clock (member’s time zone when they use the app). */
+function getLocalTimeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 type Service = {
@@ -178,31 +196,25 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { unreadCount, refetch } = useNotifications();
   const hasUnreadNotifications = unreadCount > 0;
+  const [timeOfDayGreeting, setTimeOfDayGreeting] = useState(getLocalTimeOfDayGreeting);
 
   useFocusEffect(
     useCallback(() => {
+      setTimeOfDayGreeting(getLocalTimeOfDayGreeting());
       refetch();
     }, [refetch])
   );
   const [showTelehealthDisclaimer, setShowTelehealthDisclaimer] = useState(false);
   const [showPendingActivationModal, setShowPendingActivationModal] = useState(false);
   const insets = useSafeAreaInsets();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useTabScreenSafePadding();
   const { width: screenWidth } = useWindowDimensions();
   const { isTablet, isExtraSmall } = useResponsive();
 
   const contentPaddingHorizontal = useMemo(
-    () => (screenWidth <= 320 ? moderateScale(12) : moderateScale(16)),
+    () => (screenWidth <= 320 ? moderateScale(14) : moderateScale(20)),
     [screenWidth]
   );
-
-  useEffect(() => {
-    const dimensionHandler = Dimensions.addEventListener('change', () => {
-    });
-
-    return () => {
-      dimensionHandler?.remove();
-    };
-  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -293,7 +305,7 @@ export default function HomeScreen() {
       route: hospitalDebtReliefProductIds.has(String(normalizedProductId || '')) ? '/hospital-debt-relief' : '/sharing',
     },
     {
-      title: 'HealthCare Podcast',
+      title: 'HealthYcare Podcast',
       description: 'Watch health and wellness videos to stay informed',
       icon: Play,
       route: '/healthy-podcast',
@@ -328,40 +340,83 @@ export default function HomeScreen() {
   if (loading) return <LoadingIndicator />;
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={[styles.header, { paddingTop: Math.max(insets.top, responsiveSize.sm) + responsiveSize.sm }]}
+        style={[
+          styles.stickyTopBar,
+          {
+            paddingTop: headerPaddingTop,
+            paddingHorizontal: contentPaddingHorizontal,
+          },
+        ]}
       >
-        <View style={[styles.headerContent, isTablet && styles.tabletHeaderContent]}>
+        <View style={[styles.stickyTopInner, isTablet && styles.stickyTopInnerTablet]}>
           <View style={styles.headerTop}>
-            <View style={styles.logoWrapper}>
-              <Animated.Image source={logoImg} style={styles.logo} resizeMode="contain" entering={FadeInUp.delay(150)} />
+            <View style={styles.logoColumn}>
+              <SmartText variant="overline" style={styles.sectionOverline} maxLines={1}>
+                Health Dashboard
+              </SmartText>
+              <Animated.Image
+                source={logoImg}
+                style={styles.logo}
+                resizeMode="contain"
+                entering={FadeInUp.delay(150)}
+                accessibilityLabel="MPB Health"
+                accessibilityRole="image"
+              />
             </View>
             <Animated.View style={styles.headerActions} entering={FadeInUp.delay(200)}>
-              <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/what-to-do')}>
-                <HelpCircle size={moderateScale(22)} color={colors.primary.main} />
-              </TouchableOpacity>
+              <Pressable
+                style={styles.iconButtonCompact}
+                onPress={() => {
+                  triggerLightHaptic();
+                  router.push('/what-to-do');
+                }}
+                android_ripple={{ color: `${colors.primary.main}22`, borderless: true }}
+                accessibilityRole="button"
+                accessibilityLabel="Help"
+                accessibilityHint="Opens guides and what to do next"
+              >
+                <HelpCircle size={moderateScale(20)} color={colors.primary.main} />
+              </Pressable>
 
-              <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/notifications')}>
-                <Bell size={moderateScale(22)} color={colors.primary.main} />
-                {hasUnreadNotifications && (
-                  <View style={styles.badgeOuter}>
-                    <View style={styles.badgeInner} />
+              <Pressable
+                style={styles.iconButtonCompact}
+                onPress={() => {
+                  triggerLightHaptic();
+                  router.push('/notifications');
+                }}
+                android_ripple={{ color: `${colors.primary.main}22`, borderless: true }}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  hasUnreadNotifications
+                    ? `Notifications, ${unreadCount} unread`
+                    : 'Notifications'
+                }
+                accessibilityHint="View alerts and messages"
+              >
+                <Bell size={moderateScale(20)} color={colors.primary.main} />
+                {hasUnreadNotifications ? (
+                  <View
+                    style={[styles.badgeOuter, unreadCount > 9 && styles.badgeOuterWide]}
+                    pointerEvents="none"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  >
+                    <Text
+                      style={styles.badgeCountText}
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={maxFontSizeMultiplier.caption}
+                      allowFontScaling
+                    >
+                      {unreadCount > 99 ? '99+' : String(unreadCount)}
+                    </Text>
                   </View>
-                )}
-              </TouchableOpacity>
+                ) : null}
+              </Pressable>
             </Animated.View>
           </View>
-
-          <Animated.View style={styles.welcomeSection} entering={FadeInUp.delay(250)}>
-            <SmartText variant="h2" maxLines={1} truncate>
-              Hi, {userData?.first_name || 'Member'}!
-            </SmartText>
-            <SmartText variant="body1" style={styles.welcomeMessage} maxLines={1} truncate>
-              Here's your health dashboard
-            </SmartText>
-          </Animated.View>
         </View>
       </Animated.View>
 
@@ -371,10 +426,30 @@ export default function HomeScreen() {
         overScrollMode="never"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary.main} />}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingHorizontal: contentPaddingHorizontal, paddingBottom: Math.max(insets.bottom + responsiveSize.xl, responsiveSize.xl * 2) }
+          screenChrome.scrollContent,
+          { paddingHorizontal: contentPaddingHorizontal, paddingBottom: scrollContentPaddingBottom },
         ]}
       >
+        <Animated.View
+          style={[styles.welcomeBlock, isTablet && styles.welcomeBlockTablet]}
+          entering={FadeInUp.delay(200)}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={`${timeOfDayGreeting}, ${userData?.first_name || 'Member'}`}
+        >
+          <View style={styles.welcomeAccent} accessibilityElementsHidden />
+          <View style={styles.welcomeCopy}>
+            <SmartText
+              variant="h2"
+              maxLines={2}
+              style={styles.welcomeTitle}
+              accessibilityElementsHidden
+            >
+              {timeOfDayGreeting}, {userData?.first_name || 'Member'}!
+            </SmartText>
+          </View>
+        </Animated.View>
+
         {inactiveDateWarning && (
           <Animated.View style={styles.warningBanner} entering={FadeInDown.delay(250)}>
             <View style={styles.warningIconContainer}>
@@ -405,11 +480,8 @@ export default function HomeScreen() {
 
         <Animated.View style={styles.servicesSection} entering={FadeInUp.delay(400)}>
           <View style={styles.sectionHeader}>
-            <SmartText variant="h3" maxLines={1}>
+            <SmartText variant="overline" style={styles.sectionOverline} maxLines={1}>
               Health Services
-            </SmartText>
-            <SmartText variant="body1" style={styles.sectionSubtitle}>
-              Quick access to your care options
             </SmartText>
           </View>
 
@@ -426,38 +498,11 @@ export default function HomeScreen() {
         </Animated.View>
       </ScrollView>
 
-      <Modal
-        transparent
+      <TelehealthDisclaimerModal
         visible={showTelehealthDisclaimer}
-        animationType="fade"
-        onRequestClose={() => setShowTelehealthDisclaimer(false)}
-      >
-        <View style={[styles.modalOverlay, {
-          paddingTop: Math.max(insets.top, responsiveSize.lg),
-          paddingBottom: Math.max(insets.bottom, responsiveSize.lg),
-        }]}>
-          <Card padding="lg" variant="elevated" style={styles.modalCard}>
-            <SmartText variant="h3" maxLines={2} truncate style={styles.modalTitle}>
-              Before you continue
-            </SmartText>
-            <SmartText variant="body1" style={styles.modalMessage}>
-              {TELE_DERM_DISCLAIMER}
-            </SmartText>
-
-            <TouchableOpacity
-              style={styles.confirmBtn}
-              onPress={handleConfirmTelehealth}
-              activeOpacity={0.9}
-              accessibilityRole="button"
-              accessibilityLabel="Continue to Telehealth"
-            >
-              <SmartText variant="body1" style={styles.confirmBtnText}>
-                Continue
-              </SmartText>
-            </TouchableOpacity>
-          </Card>
-        </View>
-      </Modal>
+        onClose={() => setShowTelehealthDisclaimer(false)}
+        onContinue={handleConfirmTelehealth}
+      />
 
       <Modal
         transparent
@@ -544,35 +589,29 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper
-  },
-
-  header: {
+  /** Fixed strip: logo + actions only. Greeting scrolls away in ScrollView — not part of this layer. */
+  stickyTopBar: {
     backgroundColor: colors.background.default,
-    paddingHorizontal: responsiveSize.md,
     paddingBottom: responsiveSize.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
+    zIndex: 2,
   },
-  headerContent: {
-    width: '100%'
+  stickyTopInner: {
+    width: '100%',
   },
-  tabletHeaderContent: {
+  stickyTopInnerTablet: {
     maxWidth: 1200,
-    alignSelf: 'center'
+    alignSelf: 'center',
   },
-
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: responsiveSize.md,
-    minHeight: 0,
+    minHeight: moderateScale(44),
   },
-  logoWrapper: {
+  logoColumn: {
     flex: 1,
     minWidth: 0,
     marginRight: responsiveSize.sm,
@@ -581,10 +620,10 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     flexShrink: 0,
+    alignItems: 'center',
     gap: responsiveSize.xs,
   },
-
-  iconButton: {
+  iconButtonCompact: {
     width: MIN_TOUCH_TARGET,
     height: MIN_TOUCH_TARGET,
     borderRadius: MIN_TOUCH_TARGET / 2,
@@ -592,59 +631,99 @@ const styles = StyleSheet.create({
     backgroundColor: rgbaFromHex(colors.primary.main, 0.1),
     justifyContent: 'center',
     alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
+    overflow: 'visible',
   },
   badgeOuter: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: moderateScale(14),
-    height: moderateScale(14),
-    borderRadius: moderateScale(7),
-    backgroundColor: '#fff',
+    top: moderateScale(4),
+    right: moderateScale(4),
+    minWidth: moderateScale(17),
+    minHeight: moderateScale(17),
+    paddingVertical: moderateScale(2),
+    paddingHorizontal: moderateScale(4),
+    borderRadius: moderateScale(9),
+    backgroundColor: colors.status.error,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.background.default,
     zIndex: 8,
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
-  badgeInner: {
-    width: moderateScale(9),
-    height: moderateScale(9),
-    borderRadius: moderateScale(4.5),
-    backgroundColor: colors.status.error,
+  badgeOuterWide: {
+    minWidth: moderateScale(22),
+    paddingHorizontal: moderateScale(5),
+  },
+  badgeCountText: {
+    color: colors.background.default,
+    fontSize: moderateScale(10),
+    fontWeight: '700',
+    letterSpacing: moderateScale(-0.2),
+    textAlign: 'center',
   },
 
   logo: {
-    width: moderateScale(120),
-    height: moderateScale(32),
+    width: moderateScale(112),
+    height: moderateScale(28),
     maxWidth: '100%',
+    alignSelf: 'flex-start',
   },
-  welcomeSection: {
-    paddingLeft: responsiveSize.xs,
+  welcomeBlock: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: colors.background.subtle,
+    borderRadius: borderRadius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[100],
+    paddingVertical: responsiveSize.xs,
+    paddingHorizontal: responsiveSize.sm,
+    marginBottom: responsiveSize.sm,
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.022,
+          shadowRadius: 2,
+        }
+      : {}),
   },
-  welcomeMessage: {
-    color: colors.text.secondary,
-    marginTop: responsiveSize.xs,
+  welcomeBlockTablet: {
+    maxWidth: 560,
+    width: '100%',
+    alignSelf: 'flex-start',
+  },
+  welcomeAccent: {
+    width: moderateScale(3),
+    marginRight: responsiveSize.md,
+    borderRadius: moderateScale(1.5),
+    backgroundColor: colors.primary.main,
+    alignSelf: 'stretch',
+  },
+  welcomeCopy: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  welcomeTitle: {
+    color: colors.text.primary,
+    fontWeight: '700',
+    letterSpacing: moderateScale(-0.2),
+    lineHeight: moderateScale(28),
   },
 
   scroll: {
     flex: 1
   },
-  scrollContent: {
-    padding: responsiveSize.md,
-    flexGrow: 1,
-  },
 
   warningBanner: {
     backgroundColor: `${colors.status.warning}15`,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: responsiveSize.md,
     marginBottom: responsiveSize.lg,
     flexDirection: 'row',
     alignItems: 'flex-start',
     borderLeftWidth: 4,
     borderLeftColor: colors.status.warning,
-    ...platformStyles.shadowSm,
+    ...cardChromeSm,
   },
   warningIconContainer: {
     backgroundColor: colors.background.default,
@@ -694,19 +773,21 @@ const styles = StyleSheet.create({
   quickActionCard: {
     flex: 1,
     minWidth: 0,
-    minHeight: moderateScale(92),
+    minHeight: moderateScale(96),
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     paddingVertical: responsiveSize.md,
     paddingHorizontal: responsiveSize.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    ...platformStyles.shadowSm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[100],
+    ...cardChromeSm,
   },
   quickActionIconContainer: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: borderRadius.md,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: responsiveSize.sm,
@@ -725,12 +806,13 @@ const styles = StyleSheet.create({
     flex: 1
   },
   sectionHeader: {
-    marginBottom: responsiveSize.sm,
+    marginBottom: responsiveSize.md,
     paddingLeft: responsiveSize.xs / 2,
   },
-  sectionSubtitle: {
-    color: colors.text.secondary,
-    marginTop: responsiveSize.xs,
+  sectionOverline: {
+    color: colors.primary.main,
+    marginBottom: responsiveSize.xs,
+    opacity: 0.9,
   },
 
   servicesGrid: {
@@ -757,15 +839,17 @@ const styles = StyleSheet.create({
 
   serviceCard: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: responsiveSize.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: moderateScale(104),
+    minHeight: moderateScale(108),
     flex: 1,
     minWidth: 0,
-    ...platformStyles.shadowSm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[100],
+    ...cardChromeSm,
   },
   serviceCardContent: {
     flex: 1,
@@ -776,9 +860,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   serviceIconContainer: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: borderRadius.md,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: responsiveSize.sm,
@@ -794,9 +878,9 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   chevronContainer: {
-    width: moderateScale(28),
-    height: moderateScale(28),
-    borderRadius: borderRadius.md,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,

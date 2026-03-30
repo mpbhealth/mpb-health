@@ -1,4 +1,5 @@
-import { Dimensions, Platform, PixelRatio } from 'react-native';
+import { Dimensions, Platform, PixelRatio, StyleSheet } from 'react-native';
+import { colors } from '@/constants/theme';
 
 const getScreenDimensions = () => {
   const { width, height } = Dimensions.get('window');
@@ -113,3 +114,33 @@ export const platformStyles = {
     default: 44,
   }),
 };
+
+/**
+ * Android scroll/sheet content: hairline border, **no elevation**.
+ * Material elevation shadows often paint **over sibling views** below in a ScrollView
+ * (z-order + compositing). Use this instead of `elevation` for cards, rows, and overlays.
+ */
+export const androidCardOutline = Platform.select({
+  ios: {},
+  android: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[200],
+    elevation: 0,
+  },
+  default: {},
+});
+
+/** iOS shadow + Android outline — default for elevated cards inside scroll areas */
+export const cardChromeSm = { ...platformStyles.shadowSm, ...androidCardOutline };
+export const cardChromeMd = { ...platformStyles.shadowMd, ...androidCardOutline };
+export const cardChromeLg = { ...platformStyles.shadowLg, ...androidCardOutline };
+export const cardChromeShadow = { ...platformStyles.shadow, ...androidCardOutline };
+
+/**
+ * Fixed footers / bottom nav only — safe to use elevation (not a scroll sibling).
+ */
+export const androidBarElevation = Platform.select({
+  ios: {},
+  android: { elevation: 3 },
+  default: {},
+});

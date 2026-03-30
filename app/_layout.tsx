@@ -17,7 +17,6 @@ import { Stack, useRouter } from 'expo-router';
 
 // Suppress known warnings and expected errors (push modules missing in Expo Go / dev client without rebuild)
 LogBox.ignoreLogs([
-  '[expo-av]: Expo AV has been deprecated',
   'may be overwritten by a layout animation',
   'missing the required default export',
   'ViewPropTypes',
@@ -32,12 +31,18 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useAuth } from '@/hooks/useAuth';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { routerPushSafe, routerReplaceSafe } from '@/utils/navigation';
 import { useScreenOrientationLock } from '@/hooks/useScreenOrientationLock';
 import { usePushTokenRegistration } from '@/hooks/usePushTokenRegistration';
+import { colors } from '@/constants/theme';
+import { applyAccessibleTextDefaults } from '@/utils/applyAccessibleTextDefaults';
+
+applyAccessibleTextDefaults();
 
 // Show push notifications as banners even when the app is in the foreground
 try {
@@ -114,11 +119,7 @@ export default function RootLayout() {
           : '/notifications';
       logger.debug('Push notification tapped', { pathToOpen, notificationId });
       setTimeout(() => {
-        try {
-          router.push(pathToOpen as never);
-        } catch (e) {
-          logger.debug('Push nav failed', e);
-        }
+        routerPushSafe(router, pathToOpen, 'push notification tap');
       }, 500);
       if (notificationId) {
         supabase
@@ -131,8 +132,13 @@ export default function RootLayout() {
             },
             { onConflict: 'notification_id,user_id' }
           )
-          .then(({ error }) => {
-            if (error) logger.debug('Mark read failed', error);
+          .then((result: { error: PostgrestError | null }) => {
+            if (result.error) {
+              logger.debug('Mark read failed', {
+                message: result.error.message,
+                code: result.error.code,
+              });
+            }
           });
       }
     },
@@ -191,17 +197,17 @@ export default function RootLayout() {
       if (url.includes('type=recovery')) {
         logger.debug('Navigating to reset-password (type=recovery)');
         setTimeout(() => {
-          router.push('/auth/reset-password');
+          routerPushSafe(router, '/auth/reset-password', 'deep link recovery');
         }, 500);
       } else if (url.includes('type=email_change')) {
         logger.debug('Navigating to email-confirm (type=email_change)');
         setTimeout(() => {
-          router.push('/auth/email-confirm');
+          routerPushSafe(router, '/auth/email-confirm', 'deep link email_change');
         }, 500);
       } else if (url.includes('reset-password')) {
         logger.debug('Navigating to reset-password (direct link)');
         setTimeout(() => {
-          router.push('/auth/reset-password');
+          routerPushSafe(router, '/auth/reset-password', 'deep link reset-password');
         }, 500);
       }
     };
@@ -235,7 +241,7 @@ export default function RootLayout() {
 
         if (userError || !user) {
           await signOut();
-          router.replace('/auth/sign-in');
+          routerReplaceSafe(router, '/auth/sign-in', 'session missing user');
           return;
         }
 
@@ -247,16 +253,17 @@ export default function RootLayout() {
 
         if (dbError || !dbUser) {
           await signOut();
-          router.replace('/auth/sign-in');
+          routerReplaceSafe(router, '/auth/sign-in', 'session db user missing');
         }
       } catch (err) {
+        logger.error('Session validation failed', err);
         await signOut();
-        router.replace('/auth/sign-in');
+        routerReplaceSafe(router, '/auth/sign-in', 'session validate exception');
       }
     };
 
     if (!session) {
-      setTimeout(() => router.replace('/auth/sign-in'), 100);
+      setTimeout(() => routerReplaceSafe(router, '/auth/sign-in', 'no session'), 100);
     } else {
       validate();
     }
@@ -266,7 +273,7 @@ export default function RootLayout() {
     return (
       <ErrorBoundary>
         <SafeAreaProvider>
-          <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={{ flex: 1, backgroundColor: colors.background.paper }}>
             <LoadingIndicator message="Loading…" />
             <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
           </View>
@@ -279,12 +286,13 @@ export default function RootLayout() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={{ flex: 1, backgroundColor: colors.background.default }}>
             <Stack
               screenOptions={{
                 headerShown: false,
                 animation: 'slide_from_right',
                 gestureEnabled: true,
+                contentStyle: { backgroundColor: colors.background.default },
               }}
             >
               <Stack.Screen

@@ -1,8 +1,11 @@
-import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Phone, MessageSquare, ArrowLeft } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { colors } from '@/constants/theme';
+import { screenChrome } from '@/utils/screenChrome';
+import { cardChromeSm } from '@/utils/scaling';
 
 export default function MemberSupportScreen() {
   const router = useRouter();
@@ -17,7 +20,7 @@ export default function MemberSupportScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View 
         style={[styles.header, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
@@ -26,7 +29,7 @@ export default function MemberSupportScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#111827" />
+          <ArrowLeft size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -82,20 +85,21 @@ export default function MemberSupportScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
   header: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: colors.background.default,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
+    ...cardChromeSm,
   },
   content: {
     flex: 1,
@@ -105,29 +109,31 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text.primary,
     marginBottom: 12,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: 32,
     maxWidth: 300,
     lineHeight: 24,
   },
   infoCard: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: `${colors.status.info}12`,
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
     width: '100%',
     maxWidth: 400,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: `${colors.status.info}30`,
   },
   infoText: {
     fontSize: 15,
-    color: '#0c4a6e',
+    color: colors.status.info,
     lineHeight: 24,
     textAlign: 'center',
   },
@@ -138,19 +144,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   supportButton: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.background.default,
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    ...(Platform.OS === 'ios'
-      ? {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 3,
-        }
-      : {}),
+    ...cardChromeSm,
   },
   iconContainer: {
     width: 48,
@@ -166,16 +165,16 @@ const styles = StyleSheet.create({
   buttonTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text.primary,
     marginBottom: 4,
   },
   buttonSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   supportHours: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     textAlign: 'center',
   },
 });

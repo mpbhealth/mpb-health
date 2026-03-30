@@ -2,6 +2,23 @@
 
 /**
  * WebViewContainer – in-app browser with progress, error handling, and security.
+ *
+ * ## Enhancement presets (`enhancementPreset` / `disableEnhancements`)
+ * Third-party sites differ wildly; pick a preset per screen:
+ *
+ * - **portal** (`disableEnhancements`) — Health portals, SSO, card UIs. Only adds a viewport meta if
+ *   the page has none. No CSS or zoom hacks (avoids broken `.card-wrapper` / flex layouts).
+ * - **balanced** (default) — Most marketing or form sites: light overflow + 16px inputs, preserves
+ *   the site’s own viewport. No pinch / double-tap blocking, no `visualViewport` body height hacks.
+ * - **full** — Simple long-form pages where you want fewer accidental zooms: everything in balanced
+ *   plus pinch/double-tap guards and a keyboard `visualViewport` tweak (can still break some SPAs).
+ *
+ * ## Native ↔ page bridge
+ * With `bridgeSafeAreaToPage`, the page gets CSS variables on `:root`:
+ * `--mpb-safe-area-top|bottom|left|right` (px). Progressive enhancement for your own or partner pages.
+ *
+ * ## UX
+ * `fadeInOnLoad` (default true) briefly fades content in after load so the shell feels like the app.
  */
 
 import React, {
@@ -31,6 +48,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RefreshCw, ExternalLink } from 'lucide-react-native';
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
@@ -38,6 +56,8 @@ import { responsiveSize, moderateScale, platformStyles, MIN_TOUCH_TARGET } from 
 
 const LOAD_TIMEOUT_MS = 25000;
 const PROGRESS_RESET_DELAY_MS = 400;
+
+export type WebViewEnhancementPreset = 'portal' | 'balanced' | 'full';
 
 /** Backward-compatible props (your existing ones) + a few optional niceties */
 interface WebViewContainerProps {
@@ -83,6 +103,18 @@ interface WebViewContainerProps {
 
   /** Optional: disable UX enhancements for special widgets like chat (default: false) */
   disableEnhancements?: boolean;
+  /**
+   * How aggressively we adjust third-party pages for in-app WebViews.
+   * Ignored when `disableEnhancements` is true (treated as `portal`). Default: `balanced`.
+   */
+  enhancementPreset?: WebViewEnhancementPreset;
+  /**
+   * When true, sets `--mpb-safe-area-*` on `document.documentElement` so pages can align with the
+   * app chrome (opt-in usage on the web side).
+   */
+  bridgeSafeAreaToPage?: boolean;
+  /** After first paint, fade WebView opacity 0→1 for a softer hand-off from the loading overlay. Default true. */
+  fadeInOnLoad?: boolean;
   /** Optional: message shown under the loading spinner */
   loadingMessage?: string;
   /**
@@ -101,13 +133,38 @@ interface WebViewContainerProps {
   openInBrowserAutoOpen?: boolean;
 }
 
-/** Comprehensive UX & security injection */
-const getUXInject = (disableEnhancements: boolean) => {
-  if (disableEnhancements) {
+function safeAreaInjectFragment(
+  top: number,
+  bottom: number,
+  left: number,
+  right: number,
+): string {
+  return `
+    try {
+      var r = document.documentElement;
+      r.style.setProperty('--mpb-safe-area-top', '${top}px');
+      r.style.setProperty('--mpb-safe-area-bottom', '${bottom}px');
+      r.style.setProperty('--mpb-safe-area-left', '${left}px');
+      r.style.setProperty('--mpb-safe-area-right', '${right}px');
+    } catch (e) {}
+`;
+}
+
+/** Injection script by preset; safe area is optional native→page bridge. */
+export function buildWebViewInjectionScript(
+  preset: WebViewEnhancementPreset,
+  safeArea: { top: number; bottom: number; left: number; right: number } | null,
+): string {
+  const safe =
+    safeArea != null
+      ? safeAreaInjectFragment(safeArea.top, safeArea.bottom, safeArea.left, safeArea.right)
+      : '';
+
+  if (preset === 'portal') {
     return `
 (function() {
   try {
-    // Minimal enhancements for chat widgets
+    ${safe}
     if (!document.querySelector('meta[name="viewport"]')) {
       var m = document.createElement('meta');
       m.name = 'viewport';
@@ -120,95 +177,90 @@ true;
 `;
   }
 
-  return `
-(function() {
-  try {
-    // Remove existing viewport meta tags to prevent conflicts
-    const existingMetas = document.querySelectorAll('meta[name="viewport"]');
-    existingMetas.forEach(meta => meta.remove());
-
-    // Add optimized viewport
-    var m = document.createElement('meta');
-    m.name = 'viewport';
-    m.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-    document.head.insertBefore(m, document.head.firstChild);
-
-    // Prevent horizontal scroll and force content to fit
-    const style = document.createElement('style');
+  const balancedBody = `
+    ${safe}
+    if (!document.querySelector('meta[name="viewport"]')) {
+      var mv = document.createElement('meta');
+      mv.name = 'viewport';
+      mv.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover';
+      document.head.insertBefore(mv, document.head.firstChild);
+    }
+    var style = document.createElement('style');
     style.id = 'webview-enhancements';
     style.textContent = \`
       html {
-        overflow-x: hidden !important;
-        max-width: 100vw !important;
+        overflow-x: hidden;
+        max-width: 100%;
         -webkit-overflow-scrolling: touch;
       }
       body {
-        overflow-x: hidden !important;
-        max-width: 100vw !important;
-        margin: 0 !important;
+        overflow-x: hidden;
+        max-width: 100%;
+        margin: 0;
         -webkit-tap-highlight-color: rgba(0,0,0,0);
       }
-      * {
-        max-width: 100vw !important;
-        box-sizing: border-box !important;
-      }
-      img, iframe, video {
-        max-width: 100% !important;
-        height: auto !important;
+      img, video {
+        max-width: 100%;
+        height: auto;
       }
       input, textarea, select {
-        font-size: 16px !important; /* Prevents iOS zoom on focus */
+        font-size: 16px;
       }
     \`;
     document.head.appendChild(style);
+    if (window.top !== window.self) {
+      console.warn('Nested iframe detected');
+    }
+`;
 
-    // Disable double-tap zoom
-    let lastTouchEnd = 0;
+  const fullExtras = `
+    var lastTouchEnd = 0;
     document.addEventListener('touchend', function(e) {
-      const now = Date.now();
-      if (now - lastTouchEnd <= 300) {
-        e.preventDefault();
-      }
+      var now = Date.now();
+      if (now - lastTouchEnd <= 300) { e.preventDefault(); }
       lastTouchEnd = now;
     }, false);
-
-    // Prevent pinch zoom
     document.addEventListener('touchstart', function(e) {
-      if (e.touches.length > 1) {
-        e.preventDefault();
-      }
+      if (e.touches.length > 1) { e.preventDefault(); }
     }, { passive: false });
-
-    // Prevent keyboard from pushing layout (iOS)
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', function() {
         document.body.style.height = window.visualViewport.height + 'px';
       });
     }
-
-    // Security: Prevent click-jacking
-    if (window.top !== window.self) {
-      console.warn('Nested iframe detected');
-    }
-
-    // Auto-dismiss iOS keyboard on scroll (improves UX)
-    let scrollTimer;
+    var scrollTimer;
     window.addEventListener('scroll', function() {
       clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(function() {
-        if (document.activeElement && document.activeElement.tagName.match(/input|textarea/i)) {
-          // Keep focus for form fields
-        }
-      }, 150);
+      scrollTimer = setTimeout(function() {}, 150);
     }, { passive: true });
+`;
 
+  if (preset === 'balanced') {
+    return `
+(function() {
+  try {
+    ${balancedBody}
   } catch(err) {
     console.error('WebView enhancement error:', err);
   }
 })();
 true;
 `;
-};
+  }
+
+  // full
+  return `
+(function() {
+  try {
+    ${balancedBody}
+    ${fullExtras}
+  } catch(err) {
+    console.error('WebView enhancement error:', err);
+  }
+})();
+true;
+`;
+}
 
 export const WebViewContainer = forwardRef(
   (
@@ -243,6 +295,9 @@ export const WebViewContainer = forwardRef(
       cookieStorageKey = 'webview_cookies',
       allowNestedFrames = false,
       disableEnhancements = false,
+      enhancementPreset = 'balanced',
+      bridgeSafeAreaToPage = false,
+      fadeInOnLoad = true,
       loadingMessage,
       highSecurity = false,
       openInBrowserHosts = [],
@@ -250,6 +305,15 @@ export const WebViewContainer = forwardRef(
     }: WebViewContainerProps,
     ref: ForwardedRef<WebView>,
   ) => {
+    const insets = useSafeAreaInsets();
+    const resolvedPreset: WebViewEnhancementPreset = disableEnhancements ? 'portal' : enhancementPreset;
+    const safeAreaForBridge =
+      bridgeSafeAreaToPage
+        ? { top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right }
+        : null;
+
+    const fadeAnim = useRef(new Animated.Value(fadeInOnLoad ? 0 : 1)).current;
+
     const [isLoading, setIsLoading] = useState(true);
     const [cookies, setCookies] = useState<string>('');
     const [hasError, setHasError] = useState(false);
@@ -388,6 +452,9 @@ export const WebViewContainer = forwardRef(
 
     const handleLoadStart = () => {
       if (!isMountedRef.current) return;
+      if (fadeInOnLoad) {
+        fadeAnim.setValue(0);
+      }
       setIsLoading(true);
       setHasError(false);
       onLoadStart?.();
@@ -404,10 +471,18 @@ export const WebViewContainer = forwardRef(
       setRefreshing(false);
       onLoadEnd?.();
       setProgress(1);
+      if (fadeInOnLoad) {
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }
       setTimeout(() => {
         if (isMountedRef.current) setProgress(0);
       }, PROGRESS_RESET_DELAY_MS);
-    }, [onLoadEnd]);
+    }, [onLoadEnd, fadeInOnLoad, fadeAnim]);
 
     const handleLoadError = (e: any) => {
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -415,6 +490,9 @@ export const WebViewContainer = forwardRef(
       setIsLoading(false);
       setRefreshing(false);
       setHasError(true);
+      if (fadeInOnLoad) {
+        fadeAnim.setValue(1);
+      }
       onError?.(e);
     };
 
@@ -485,8 +563,17 @@ export const WebViewContainer = forwardRef(
           },
         };
 
-    // Combined injection: your injected JS + UX helper
-    const uxInject = getUXInject(disableEnhancements);
+    const uxInject = useMemo(
+      () => buildWebViewInjectionScript(resolvedPreset, safeAreaForBridge),
+      [
+        resolvedPreset,
+        bridgeSafeAreaToPage,
+        insets.top,
+        insets.bottom,
+        insets.left,
+        insets.right,
+      ],
+    );
     const combinedInjectedJS = `${uxInject}\n;${injectedJavaScript || ''}`;
 
     // Sites that block WebViews: show "Open in browser" UI instead of loading in WebView
@@ -593,7 +680,8 @@ export const WebViewContainer = forwardRef(
           ]}
         />
 
-        <WebView
+        <Animated.View style={[styles.webViewOuter, { opacity: fadeAnim }]}>
+          <WebView
           ref={webViewRef as any}
           originWhitelist={originWhitelist}
           source={source}
@@ -685,6 +773,7 @@ export const WebViewContainer = forwardRef(
           cacheMode={highSecurity && Platform.OS === 'android' ? 'LOAD_NO_CACHE' : 'LOAD_DEFAULT'}
           incognito={!persistCookies}
         />
+        </Animated.View>
 
         {isLoading && (
           <View style={[styles.loadingContainer, dark && styles.loadingContainerDark]}>
@@ -707,9 +796,14 @@ const styles = StyleSheet.create({
   containerDark: {
     backgroundColor: colors.background.paper,
   },
+  webViewOuter: {
+    flex: 1,
+    backgroundColor: colors.background.default,
+  },
   webview: {
     flex: 1,
     backgroundColor: colors.background.default,
+    opacity: 1,
   },
   progressBar: {
     position: 'absolute',

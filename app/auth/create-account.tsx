@@ -21,7 +21,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeSm, cardChromeLg, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const formatDateForStorage = (dobString: string): string => {
@@ -257,12 +259,12 @@ export default function CreateAccountScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={screenChrome.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       <ScrollView
-        style={styles.container}
+        style={screenChrome.container}
         overScrollMode="never"
         contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
@@ -354,7 +356,6 @@ export default function CreateAccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.default },
   scrollContent: { flexGrow: 1, padding: spacing.lg },
   content: { flex: 1, width: '100%', maxWidth: 400, alignSelf: 'center' },
   header: { marginBottom: spacing.xxl },
@@ -365,16 +366,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.sm,
+    ...cardChromeSm,
   },
   formContainer: {
     width: '100%',
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
-    ...shadows.lg,
-    borderWidth: 1,
-    borderColor: colors.gray[100],
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[200],
+    ...cardChromeLg,
   },
   title: { ...typography.h2, fontWeight: '700' as const, color: colors.text.primary, marginBottom: spacing.xs, textAlign: 'center' as const },
   subtitle: { ...typography.body1, color: colors.text.secondary, marginBottom: spacing.xl, textAlign: 'center' as const, lineHeight: 24 },
@@ -419,7 +420,7 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     marginTop: spacing.md,
     marginBottom: spacing.xl,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   createButtonDisabled: { opacity: 0.7 },
   createButtonText: { color: colors.background.default, ...typography.body1, fontWeight: '700' as const },

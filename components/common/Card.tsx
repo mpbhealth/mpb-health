@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, ViewStyle, StyleSheet, Platform } from 'react-native';
-import { responsiveSize, platformStyles } from '@/utils/scaling';
+import { View, ViewStyle, StyleSheet } from 'react-native';
+import { responsiveSize, cardChromeSm } from '@/utils/scaling';
 import { colors, borderRadius } from '@/constants/theme';
 
 interface CardProps {
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   },
   elevated: {
     backgroundColor: colors.background.default,
-    ...platformStyles.shadowSm,
+    ...cardChromeSm,
   },
   outlined: {
     backgroundColor: colors.background.default,

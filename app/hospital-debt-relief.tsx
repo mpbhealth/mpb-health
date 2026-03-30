@@ -15,13 +15,9 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { BackButton } from '@/components/common/BackButton';
 import { WebViewContainer } from '@/components/common/WebViewContainer';
-import {
-  colors,
-  shadows,
-  typography,
-  spacing,
-  borderRadius,
-} from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeSm, cardChromeMd, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -48,7 +44,7 @@ export default function HospitalDebtReliefScreen() {
 
   if (showApplicationWebView) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={headerStyle}>
           <BackButton onPress={() => setShowApplicationWebView(false)} />
           <View style={styles.headerContent}>
@@ -61,7 +57,7 @@ export default function HospitalDebtReliefScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
         <Text style={styles.title}>Hospital Debt Relief</Text>
@@ -144,16 +140,15 @@ export default function HospitalDebtReliefScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerContent: {
     flex: 1,
@@ -181,7 +176,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
-    ...shadows.md,
+    ...cardChromeMd,
   },
   introContent: {
     flex: 1,
@@ -222,7 +217,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     marginBottom: spacing.xl,
-    ...shadows.md,
+    ...cardChromeMd,
   },
   codeTitle: {
     ...typography.h3,
@@ -279,13 +274,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
-    ...shadows.md,
+    ...cardChromeMd,
   },
   applicationSection: {
     backgroundColor: colors.background.paper,
     borderRadius: borderRadius.lg,
     marginBottom: spacing.md,
-    ...shadows.sm,
+    ...cardChromeSm,
   },
   applicationSectionContent: {
     padding: spacing.lg,

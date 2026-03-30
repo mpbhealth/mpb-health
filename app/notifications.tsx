@@ -15,8 +15,9 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
 import { EmptyState } from '@/components/common/EmptyState';
-import { colors, borderRadius, typography, spacing, shadows } from '@/constants/theme';
-import { moderateScale, MIN_TOUCH_TARGET } from '@/utils/scaling';
+import { colors, borderRadius, typography, spacing } from '@/constants/theme';
+import { moderateScale, MIN_TOUCH_TARGET, cardChromeSm, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useNotifications, type AppNotification } from '@/hooks/useNotifications';
@@ -82,7 +83,7 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View
           entering={FadeInDown.delay(100)}
           style={[styles.header, { paddingTop: headerPaddingTop }]}
@@ -104,7 +105,7 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View
         entering={FadeInDown.delay(100)}
         style={[styles.header, { paddingTop: headerPaddingTop }]}
@@ -122,7 +123,7 @@ export default function NotificationsScreen() {
 
       <ScrollView
         overScrollMode="never"
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom + 40 }]}
+        contentContainerStyle={[screenChrome.scrollContent, styles.scrollContentExtra, { paddingBottom: scrollContentPaddingBottom + 40 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -191,12 +192,12 @@ export default function NotificationsScreen() {
                           </View>
                         )}
                         <View style={styles.line}>
-                          <SmartText variant="body1" style={[styles.cardTitle, urgent && styles.cardTitleUrgent, welcome && styles.cardTitleWelcome]} numberOfLines={2}>
+                          <SmartText variant="body1" style={[styles.cardTitle, urgent && styles.cardTitleUrgent, welcome && styles.cardTitleWelcome]}>
                             {n.title}
                           </SmartText>
                           {!n.read && <View style={[styles.unreadDot, { backgroundColor: accent }]} />}
                         </View>
-                        <SmartText variant="body2" style={[styles.cardMsg, urgent && styles.cardMsgUrgent]} numberOfLines={2}>
+                        <SmartText variant="body2" style={[styles.cardMsg, urgent && styles.cardMsgUrgent]}>
                           {n.message}
                         </SmartText>
                         <Text style={styles.cardDate}>{formatDate(n.date)}</Text>
@@ -217,19 +218,15 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
     backgroundColor: colors.background.default,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingBottom: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.gray[200],
-    ...(Platform.OS === 'ios' ? shadows.sm : {}),
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   headerTextBlock: {
     flex: 1,
@@ -255,8 +252,7 @@ const styles = StyleSheet.create({
     ...typography.body2,
     color: colors.text.secondary,
   },
-  scrollContent: {
-    padding: spacing.lg,
+  scrollContentExtra: {
     paddingBottom: spacing.xxl * 3,
   },
   maxWidthContainer: {
@@ -277,12 +273,12 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     minHeight: MIN_TOUCH_TARGET,
     overflow: 'hidden',
-    ...shadows.sm,
+    ...cardChromeSm,
   },
   cardUnread: {
     backgroundColor: colors.primary.main + '06',
@@ -387,6 +383,7 @@ const styles = StyleSheet.create({
   },
   cardMsg: {
     color: colors.text.secondary,
+    flexShrink: 1,
   },
   cardMsgUrgent: {
     color: '#7F1D1D',
@@ -398,6 +395,8 @@ const styles = StyleSheet.create({
   },
   chevronWrap: {
     paddingRight: spacing.md,
+    paddingVertical: spacing.md,
     justifyContent: 'center',
+    alignSelf: 'center',
   },
 });

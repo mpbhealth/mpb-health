@@ -28,7 +28,8 @@ import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { supabase } from '@/lib/supabase';
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, platformStyles, cardChromeLg } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -266,7 +267,7 @@ export default function SignInScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={screenChrome.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -421,7 +422,6 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.default },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -439,11 +439,11 @@ const styles = StyleSheet.create({
 
   formContainer: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: responsiveSize.lg,
-    ...platformStyles.shadow,
-    borderWidth: 1,
-    borderColor: colors.gray[100],
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[200],
+    ...cardChromeLg,
   },
 
   welcomeText: {
@@ -468,11 +468,12 @@ const styles = StyleSheet.create({
   inputContainer: { marginBottom: responsiveSize.md },
   label: { fontWeight: '600', color: colors.text.primary, marginBottom: responsiveSize.xs },
   input: {
-    backgroundColor: colors.background.paper,
-    borderWidth: 1,
+    backgroundColor: colors.background.subtle,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.gray[200],
-    borderRadius: borderRadius.md,
-    padding: responsiveSize.sm,
+    borderRadius: borderRadius.lg,
+    paddingVertical: responsiveSize.md,
+    paddingHorizontal: responsiveSize.md,
     fontSize: moderateScale(15),
     color: colors.text.primary,
   },
@@ -482,10 +483,11 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background.paper,
-    borderWidth: 1,
+    backgroundColor: colors.background.subtle,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.gray[200],
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
+    minHeight: moderateScale(48),
   },
   passwordInput: { flex: 1, padding: responsiveSize.sm, fontSize: moderateScale(15), color: colors.text.primary },
   eyeButton: { padding: responsiveSize.sm },
@@ -495,11 +497,15 @@ const styles = StyleSheet.create({
 
   signInButton: {
     backgroundColor: colors.primary.main,
-    padding: responsiveSize.sm,
-    borderRadius: borderRadius.md,
+    paddingVertical: responsiveSize.md,
+    paddingHorizontal: responsiveSize.lg,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     marginBottom: responsiveSize.xs,
-    ...platformStyles.shadow,
+    minHeight: moderateScale(48),
+    justifyContent: 'center',
+    elevation: 0,
+    ...(Platform.OS === 'ios' ? platformStyles.shadow : {}),
   },
   signInButtonDisabled: { opacity: 0.7 },
   signInButtonText: { color: colors.background.default, fontWeight: '600' },

@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { BackButton } from '@/components/common/BackButton';
 import { SmartText } from '@/components/common/SmartText';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { colors } from '@/constants/theme';
-import { responsiveSize, platformStyles } from '@/utils/scaling';
+import { screenChrome, screenHeaderRow } from '@/utils/screenChrome';
 
 interface ScreenLayoutProps {
   /** Screen title (header) */
   title: string;
+  /** Optional small label above title (uppercase overline style) */
+  overline?: string;
   /** Back button press (e.g. router.back) */
   onBack: () => void;
   /** Main content (rendered inside ScrollView) */
@@ -21,10 +23,11 @@ interface ScreenLayoutProps {
 
 /**
  * Consistent screen shell: safe-area header (back + title) + scroll content.
- * Use on any screen for layout consistency and correct insets on all devices.
+ * Matches stack screens: hairline header rule, paper body, lg horizontal inset.
  */
 export function ScreenLayout({
   title,
+  overline,
   onBack,
   children,
   noScroll = false,
@@ -33,18 +36,29 @@ export function ScreenLayout({
   const { headerPaddingTop, scrollContentPaddingBottom } = useSafeHeaderPadding();
 
   const header = (
-    <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+    <View style={screenHeaderRow(headerPaddingTop)}>
       <BackButton onPress={onBack} />
-      <SmartText variant="h2" style={styles.title} numberOfLines={1}>
-        {title}
-      </SmartText>
+      {overline ? (
+        <View style={screenChrome.headerTitleColumn}>
+          <SmartText variant="overline" style={screenChrome.overline} numberOfLines={2} ellipsizeMode="tail">
+            {overline}
+          </SmartText>
+          <SmartText variant="h2" style={styles.headerH2} numberOfLines={2} ellipsizeMode="tail">
+            {title}
+          </SmartText>
+        </View>
+      ) : (
+        <SmartText variant="h2" style={screenChrome.title} numberOfLines={2} ellipsizeMode="tail">
+          {title}
+        </SmartText>
+      )}
       {headerRight ?? <View style={styles.placeholder} />}
     </View>
   );
 
   if (noScroll) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         {header}
         {children}
       </View>
@@ -52,14 +66,11 @@ export function ScreenLayout({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       {header}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: scrollContentPaddingBottom },
-        ]}
+        contentContainerStyle={[screenChrome.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
         keyboardShouldPersistTaps="handled"
@@ -71,35 +82,14 @@ export function ScreenLayout({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: responsiveSize.md,
-    paddingBottom: responsiveSize.md,
-    backgroundColor: colors.background.default,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  title: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
+  headerH2: {
     color: colors.text.primary,
     fontWeight: '700',
-    minWidth: 0,
   },
   placeholder: {
     width: 40,
   },
   scroll: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    flexGrow: 1,
   },
 });

@@ -5,38 +5,155 @@ import {
   MessageCircle,
   User as UserIcon,
 } from 'lucide-react-native';
-import { Platform, View, Pressable, StyleSheet } from 'react-native';
-import { BlurView as ExpoBlurView } from 'expo-blur';
+import {
+  Platform,
+  View,
+  Pressable,
+  StyleSheet,
+  type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
+import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
+import { BlurView } from 'expo-blur';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, platformStyles, androidBarElevation } from '@/utils/scaling';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-const ACTIVE_INDICATOR_HEIGHT = 3;
+/** Material 3 bottom navigation active indicator (horizontal pill), dp-aligned ~64×32 zone */
+const ACTIVE_PILL_HORIZONTAL_PADDING = moderateScale(14);
+const ACTIVE_PILL_VERTICAL_PADDING = moderateScale(6);
+const RIPPLE_PRIMARY = `${colors.primary.main}18`;
 
-export default function TabLayout() {
-  const { session, loading } = useAuth();
+type MaterialTabBarButtonProps = {
+  children: React.ReactNode;
+  onPress?: (e: GestureResponderEvent) => void;
+  onLongPress?: ((e: GestureResponderEvent) => void) | null;
+  accessibilityState?: { selected?: boolean };
+  testID?: string;
+  style?: StyleProp<ViewStyle>;
+  href?: string;
+};
+
+/**
+ * M3-style tab trigger: tonal container when selected, ripple, light scale — hooks live in a real component.
+ */
+function MaterialTabBarButton({
+  children,
+  onPress,
+  onLongPress,
+  accessibilityState,
+  testID,
+  style,
+}: MaterialTabBarButtonProps) {
+  const focused = accessibilityState?.selected ?? false;
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: withSpring(focused ? 1.02 : 1, {
+          mass: 1,
+          damping: 16,
+          stiffness: 220,
+        }),
+      },
+    ],
+    backgroundColor: withTiming(focused ? `${colors.primary.main}14` : 'transparent', { duration: 180 }),
+  }));
+
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[styles.tabPressable, style]}
+      android_ripple={{ color: RIPPLE_PRIMARY, borderless: false, foreground: true }}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+    >
+      <AnimatedView style={[styles.tabAnimated, animatedStyle]}>{children}</AnimatedView>
+    </Pressable>
+  );
+}
+
+/**
+ * iOS: native `UITabBarController` via Expo `NativeTabs` — system tab bar with standard blur
+ * and (on iOS 26+, when built with a matching SDK) the Liquid Glass tab bar.
+ * Android / others: JS `Tabs` with Material 3–inspired bottom navigation (surface, elevation, capsule selection).
+ */
+function IosNativeTabsLayout() {
+  return (
+    <NativeTabs
+      tintColor={colors.primary.main}
+      labelStyle={{
+        default: {
+          color: colors.gray[500],
+          fontWeight: '600',
+        },
+        selected: {
+          color: colors.primary.main,
+          fontWeight: '600',
+        },
+      }}
+      iconColor={{
+        default: colors.gray[500],
+        selected: colors.primary.main,
+      }}
+    >
+      <NativeTabs.Trigger name="index">
+        <Label>Home</Label>
+        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="chat">
+        <Label>Concierge</Label>
+        <Icon
+          sf={{
+            default: 'bubble.left.and.bubble.right',
+            selected: 'bubble.left.and.bubble.right.fill',
+          }}
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <Label>Profile</Label>
+        <Icon sf={{ default: 'person', selected: 'person.fill' }} />
+      </NativeTabs.Trigger>
+    </NativeTabs>
+  );
+}
+
+/**
+ * Full-width glass bar (same x-position as before; only the top corners are rounded).
+ * Blur can look identical to a solid if nothing paints behind the tab region — we combine
+ * native blur (when available) with a light frost + edge highlights so it reads as “glass”
+ * even over the default paper background.
+ */
+function AndroidTabBarGlassBackground() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <BlurView
+        tint="light"
+        intensity={82}
+        experimentalBlurMethod="dimezisBlurView"
+        blurReductionFactor={2.2}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.androidGlassFrost} pointerEvents="none" />
+      <View style={styles.androidGlassTopHighlight} pointerEvents="none" />
+      <View style={styles.androidGlassTopHairline} pointerEvents="none" />
+    </View>
+  );
+}
+
+function AndroidAndFallbackTabsLayout() {
   const insets = useSafeAreaInsets();
-  const tabBarHeight = moderateScale(60) + (Platform.OS === 'ios' ? insets.bottom : Math.max(insets.bottom, responsiveSize.sm));
-
-  if (loading) return <LoadingIndicator message="Loading…" />;
-  if (!session) return <Redirect href="/auth/sign-in" />;
-
-  const handleTabPress = (onPress: () => void) => {
-    try {
-      const Haptics = require('expo-haptics');
-      if (Platform.OS === 'ios') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch {
-      // expo-haptics not installed
-    }
-    onPress();
-  };
+  const bottomPad = Math.max(insets.bottom, responsiveSize.sm);
+  const tabBarHeight = moderateScale(56) + bottomPad;
+  const isAndroidGlass = Platform.OS === 'android';
 
   return (
     <Tabs
@@ -44,80 +161,57 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary.main,
         tabBarInactiveTintColor: colors.gray[500],
+        tabBarHideOnKeyboard: true,
         tabBarStyle: [
-          styles.tabBarBase,
+          isAndroidGlass ? styles.tabBarAndroidGlassShell : styles.tabBarBase,
+          isAndroidGlass ? null : styles.tabBarMaterialSurface,
+          isAndroidGlass ? styles.tabBarAndroidGlassElevation : null,
           {
             height: tabBarHeight,
-            paddingBottom: Platform.OS === 'ios' ? insets.bottom : Math.max(insets.bottom, responsiveSize.sm),
-            paddingTop: responsiveSize.sm,
+            paddingBottom: bottomPad,
+            paddingTop: responsiveSize.xs,
+            paddingHorizontal: responsiveSize.xs,
           },
-          Platform.select({ ios: styles.tabBarIOS, android: styles.tabBarAndroid }),
         ],
         tabBarLabelStyle: {
-          fontSize: moderateScale(11),
+          fontSize: moderateScale(12),
           fontWeight: '600',
-          marginTop: responsiveSize.xs / 4,
-          letterSpacing: 0.2,
+          marginTop: moderateScale(2),
+          letterSpacing: 0.1,
         },
         tabBarItemStyle: {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: moderateScale(48),
+          borderRadius: borderRadius.full,
         },
         tabBarIconStyle: {
-          marginTop: responsiveSize.xs / 4,
+          marginTop: 0,
         },
         tabBarBackground: () =>
-          Platform.OS === 'ios' ? (
-            <ExpoBlurView tint="light" intensity={80} style={StyleSheet.absoluteFill} />
-          ) : (
-            <View style={StyleSheet.absoluteFill} />
-          ),
-        tabBarButton: ({ children, onPress, accessibilityState }) => {
-          const focused = accessibilityState?.selected ?? false;
-          const animatedStyle = useAnimatedStyle(() => ({
-            transform: [
-              {
-                scale: withSpring(focused ? 1.06 : 1, {
-                  mass: 1,
-                  damping: 15,
-                  stiffness: 200,
-                }),
-              },
-            ],
-            backgroundColor: withTiming(
-              focused ? `${colors.primary.main}12` : 'transparent',
-              { duration: 200 }
-            ),
-          }));
-          return (
-            <Pressable
-              onPress={() => handleTabPress(onPress)}
-              style={styles.tabPressable}
-              android_ripple={{ color: `${colors.primary.main}15`, borderless: false }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
-            >
-              <AnimatedView style={[styles.tabAnimated, animatedStyle]}>
-                {children}
-                <View
-                  style={[
-                    styles.activeIndicator,
-                    { opacity: focused ? 1 : 0 },
-                  ]}
-                />
-              </AnimatedView>
-            </Pressable>
-          );
-        },
+          isAndroidGlass ? <AndroidTabBarGlassBackground /> : <View style={StyleSheet.absoluteFill} />,
+        tabBarButton: (props) => (
+          <MaterialTabBarButton
+            {...props}
+            onPress={(e) => {
+              try {
+                const Haptics = require('expo-haptics');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {
+                // expo-haptics optional
+              }
+              props.onPress?.(e);
+            }}
+          />
+        ),
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <HomeIcon size={moderateScale(24)} color={color} />,
+          tabBarIcon: ({ color }) => <HomeIcon size={moderateScale(24)} color={color} strokeWidth={2} />,
           tabBarAccessibilityLabel: 'Home',
         }}
       />
@@ -125,7 +219,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Concierge',
-          tabBarIcon: ({ color }) => <MessageCircle size={moderateScale(24)} color={color} />,
+          tabBarIcon: ({ color }) => <MessageCircle size={moderateScale(24)} color={color} strokeWidth={2} />,
           tabBarAccessibilityLabel: 'Concierge chat',
         }}
       />
@@ -133,7 +227,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <UserIcon size={moderateScale(24)} color={color} />,
+          tabBarIcon: ({ color }) => <UserIcon size={moderateScale(24)} color={color} strokeWidth={2} />,
           tabBarAccessibilityLabel: 'Profile',
         }}
       />
@@ -141,39 +235,80 @@ export default function TabLayout() {
   );
 }
 
+export default function TabLayout() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background.paper }}>
+        <LoadingIndicator message="Loading…" />
+      </View>
+    );
+  }
+  if (!session) return <Redirect href="/auth/sign-in" />;
+
+  if (Platform.OS === 'ios') {
+    return <IosNativeTabsLayout />;
+  }
+
+  return <AndroidAndFallbackTabsLayout />;
+}
+
 const styles = StyleSheet.create({
   tabBarBase: {
-    borderTopWidth: 0.5,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.gray[200],
     ...platformStyles.shadowSm,
   },
-  tabBarIOS: {
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+  /** Full-width glass: transparent shell; top corners only (not a floating centered dock). */
+  tabBarAndroidGlassShell: {
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    borderTopLeftRadius: moderateScale(22),
+    borderTopRightRadius: moderateScale(22),
+    overflow: 'hidden',
   },
-  tabBarAndroid: {
-    backgroundColor: colors.background.default,
+  tabBarAndroidGlassElevation: {
+    ...androidBarElevation,
+  },
+  /** Lets blur read as frosted even over a flat paper scaffold. */
+  androidGlassFrost: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  /** Specular “lip” so the bar separates from content without a heavy border. */
+  androidGlassTopHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: moderateScale(1),
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  androidGlassTopHairline: {
+    position: 'absolute',
+    top: moderateScale(1),
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(15, 23, 42, 0.07)',
+  },
+  /** M3 “surface” slightly lifted from page background */
+  tabBarMaterialSurface: {
+    backgroundColor: colors.background.subtle,
   },
   tabPressable: {
     flex: 1,
-    borderRadius: borderRadius.md,
-    marginHorizontal: responsiveSize.xs / 2,
+    borderRadius: borderRadius.full,
+    marginHorizontal: responsiveSize.xs / 3,
     overflow: 'hidden',
   },
   tabAnimated: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
-    paddingVertical: responsiveSize.xs,
-    paddingHorizontal: responsiveSize.sm,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: '25%',
-    right: '25%',
-    height: ACTIVE_INDICATOR_HEIGHT,
-    borderRadius: ACTIVE_INDICATOR_HEIGHT / 2,
-    backgroundColor: colors.primary.main,
+    borderRadius: borderRadius.full,
+    paddingVertical: ACTIVE_PILL_VERTICAL_PADDING,
+    paddingHorizontal: ACTIVE_PILL_HORIZONTAL_PADDING,
   },
 });

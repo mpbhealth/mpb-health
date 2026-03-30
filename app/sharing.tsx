@@ -9,8 +9,15 @@ import { Card } from '@/components/common/Card';
 import { useUserData } from '@/hooks/useUserData';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale } from '@/utils/scaling';
+import {
+  hubScreenHeader,
+  hubHeaderA11y,
+  hubScreenScroll,
+  hubListRow,
+} from '@/utils/hubListScreenLayout';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { screenChrome } from '@/utils/screenChrome';
 import { useResponsive } from '@/hooks/useResponsive';
 import Animated, {
   FadeInDown,
@@ -49,7 +56,7 @@ export default function SharingScreen() {
   ];
 
   // Product IDs that should see Sedera Health
-  const sederaHealthProductIds = ['43957', '44036','46455', ,'38035','38036'];
+  const sederaHealthProductIds = ['43957', '44036', '46455', '38035', '38036'];
 
   // Determine which programs to show based on product_id
   const availablePrograms = [];
@@ -83,14 +90,16 @@ export default function SharingScreen() {
   if (selectedProgram) {
     return (
       <Animated.View
-        style={styles.container}
+        style={screenChrome.container}
         entering={SlideInRight}
         exiting={SlideOutLeft}
       >
-        <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+        <View style={[hubScreenHeader.bar, { paddingTop: headerPaddingTop }]}>
           <BackButton onPress={() => setSelectedProgram(null)} />
-          <View style={styles.headerContent}>
-            <SmartText variant="h3" style={styles.headerTitle}>{selectedProgram.title}</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h3" style={hubScreenHeader.detailTitle} {...hubHeaderA11y.detailTitle}>
+              {selectedProgram.title}
+            </SmartText>
           </View>
         </View>
 
@@ -100,29 +109,42 @@ export default function SharingScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View
-        style={[styles.header, { paddingTop: headerPaddingTop }]}
+        style={[hubScreenHeader.bar, { paddingTop: headerPaddingTop }]}
         entering={FadeInDown.delay(100)}
       >
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>Sharing</SmartText>
+        <View style={hubScreenHeader.content}>
+          <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+            Sharing
+          </SmartText>
+        </View>
       </Animated.View>
 
       <ScrollView
-        style={styles.content}
+        style={[hubScreenScroll.content, hubScreenScroll.contentShade]}
         overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, hubScreenScroll.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xl }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[hubScreenScroll.maxWidthContainer, isTablet && hubScreenScroll.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
-            <SmartText variant="body1" style={styles.description}>
-              Our sharing connect you with a community of health-conscious individuals who share in each other's medical expenses. Submit and manage your medical needs through your designated sharing program.
+            <SmartText variant="body1" style={[hubScreenScroll.description, styles.descriptionTight]}>
+              Sharing programs connect you with a community of members who share eligible medical expenses. Open your portal below to submit and manage needs through your plan.
             </SmartText>
           </Animated.View>
 
-          <View style={styles.programsGrid}>
+          {availablePrograms.length === 0 && (
+            <Animated.View entering={FadeInUp.delay(240)}>
+              <SmartText variant="body2" style={styles.emptyHint}>
+                No Zion or Sedera portal is linked to your membership in the app. Contact concierge if you need help finding your sharing program.
+              </SmartText>
+            </Animated.View>
+          )}
+
+          <View style={hubScreenScroll.listGap}>
             {availablePrograms.map((program, index) => (
               <Animated.View
                 key={program.title}
@@ -130,23 +152,34 @@ export default function SharingScreen() {
                 layout={Layout.springify()}
               >
                 <TouchableOpacity
-                  style={styles.programCard}
-                  onPress={() => setSelectedProgram(program)}
+                  style={hubListRow.card}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${program.title}`}
+                  activeOpacity={0.92}
+                  onPress={() =>
+                    setSelectedProgram({
+                      title: program.title,
+                      url: program.url,
+                      color: program.color,
+                    })
+                  }
                 >
-                  <View style={styles.programContent}>
-                    <View style={[styles.iconContainer, { backgroundColor: program.gradient }]}>
-                      <Building2 size={moderateScale(26)} color={program.color} />
+                  <View style={hubListRow.rowInner}>
+                    <View style={[hubListRow.iconTile, { backgroundColor: program.gradient }]}>
+                      <Building2 size={moderateScale(24)} color={program.color} />
                     </View>
-                    <View style={styles.textContainer}>
-                      <SmartText variant="body1" style={styles.programTitle}>
+                    <View style={hubListRow.textBlock}>
+                      <SmartText variant="body1" style={hubListRow.rowTitle}>
                         {program.title}
                       </SmartText>
-                      <SmartText variant="body2" style={styles.programDescription}>
+                      <SmartText variant="body2" style={hubListRow.rowDescription}>
                         {program.description}
                       </SmartText>
                     </View>
                   </View>
-                  <ExternalLink size={moderateScale(18)} color={program.color} />
+                  <View style={[hubListRow.openHint, { borderWidth: 0, backgroundColor: program.gradient }]}>
+                    <ExternalLink size={moderateScale(18)} color={program.color} />
+                  </View>
                 </TouchableOpacity>
               </Animated.View>
             ))}
@@ -169,95 +202,14 @@ export default function SharingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
+  descriptionTight: {
+    marginBottom: responsiveSize.md,
   },
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
-    minWidth: 0,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  title: {
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-    flex: 1,
-    minWidth: 0,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
-  },
-  tabletMaxWidth: {
-    maxWidth: 900,
-  },
-
-  description: {
+  emptyHint: {
     color: colors.text.secondary,
     marginBottom: responsiveSize.lg,
-  },
-
-  programsGrid: {
-    gap: responsiveSize.md,
-    marginBottom: responsiveSize.lg,
-  },
-
-  programCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
-  },
-  programContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    minWidth: 0,
-  },
-  iconContainer: {
-    width: moderateScale(48),
-    height: moderateScale(48),
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: responsiveSize.sm,
-    flexShrink: 0,
-  },
-  textContainer: {
-    flex: 1,
-    minWidth: 0,
-    gap: responsiveSize.xs / 2,
-  },
-  programTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  programDescription: {
-    color: colors.text.secondary,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
 
   warningCard: {
@@ -272,5 +224,6 @@ const styles = StyleSheet.create({
   },
   warningText: {
     color: colors.status.warning,
+    lineHeight: 20,
   },
 });

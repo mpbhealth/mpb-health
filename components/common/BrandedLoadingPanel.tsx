@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet, Image, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Image, Platform } from 'react-native';
 import Animated, {
-  FadeIn,
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
@@ -13,24 +12,14 @@ import Animated, {
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
 import {
-  responsiveSize,
   moderateScale,
-  platformStyles,
   cardChromeSm,
+  responsiveSize,
+  platformStyles,
   androidCardOutline,
 } from '@/utils/scaling';
 
 const logoImg = require('../../assets/images/logo.png');
-
-export type LoadingIndicatorVariant = 'fullscreen' | 'overlay' | 'inline';
-
-interface LoadingIndicatorProps {
-  message?: string;
-  /** fullscreen: branded backdrop + centered card. overlay: scrim + card. inline: compact row (e.g. in players). */
-  variant?: LoadingIndicatorVariant;
-  /** Use for inline on dark backdrops (light spinner + label). */
-  appearance?: 'default' | 'onDark';
-}
 
 function rgbaFromHex(hex: string, alpha: number) {
   const clean = hex.replace('#', '');
@@ -41,15 +30,23 @@ function rgbaFromHex(hex: string, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export function LoadingIndicator({
-  message = 'Loading…',
-  variant = 'fullscreen',
-  appearance = 'default',
-}: LoadingIndicatorProps) {
-  const inlineOnDark = appearance === 'onDark';
-  const inlineSpinnerColor = inlineOnDark ? '#FFFFFF' : colors.primary.main;
-  const inlineLabelColor = inlineOnDark ? 'rgba(255, 255, 255, 0.92)' : colors.text.secondary;
+export type BrandedLoadingPanelProps = {
+  title?: string;
+  subtitle: string;
+  hint?: string | null;
+  compact?: boolean;
+  variant?: 'card' | 'immersive';
+  elevated?: boolean;
+};
 
+export function BrandedLoadingPanel({
+  title = 'Loading…',
+  subtitle,
+  hint,
+  compact = false,
+  variant = 'card',
+  elevated = false,
+}: BrandedLoadingPanelProps) {
   const ringPulse = useSharedValue(1);
 
   useEffect(() => {
@@ -67,74 +64,77 @@ export function LoadingIndicator({
     transform: [{ scale: ringPulse.value }],
   }));
 
-  const a11y = {
-    accessibilityRole: 'progressbar' as const,
-    accessibilityLabel: message,
-    accessibilityState: { busy: true as const },
-  };
-
-  if (variant === 'inline') {
-    return (
-      <Animated.View entering={FadeIn.duration(240)} style={styles.inlineRoot} {...a11y}>
-        <ActivityIndicator size="small" color={inlineSpinnerColor} />
-        <SmartText variant="body2" style={[styles.inlineMessage, { color: inlineLabelColor }]}>
-          {message}
-        </SmartText>
-      </Animated.View>
-    );
-  }
+  const a11yLabel = [title, subtitle, hint].filter(Boolean).join('. ');
 
   const panel = (
     <Animated.View
       entering={FadeInDown.duration(340)}
-      style={[styles.panel, variant === 'overlay' && styles.panelElevated]}
+      style={[
+        styles.panel,
+        compact && styles.panelCompact,
+        (variant === 'immersive' || elevated) && styles.panelElevated,
+      ]}
     >
       <Image
         source={logoImg}
-        style={styles.logo}
+        style={[styles.logo, compact && styles.logoCompact]}
         resizeMode="contain"
         accessibilityIgnoresInvertColors
       />
-      <Animated.View style={[styles.spinnerRing, ringStyle]}>
+      <Animated.View style={[styles.spinnerRing, compact && styles.spinnerRingCompact, ringStyle]}>
         <ActivityIndicator size="large" color={colors.primary.main} />
       </Animated.View>
-      <SmartText variant="body1" style={styles.message}>
-        {message}
+      <SmartText variant="h3" style={styles.title}>
+        {title}
       </SmartText>
+      <SmartText variant="body1" style={styles.subtitle}>
+        {subtitle}
+      </SmartText>
+      {hint ? (
+        <SmartText variant="body2" style={styles.hint}>
+          {hint}
+        </SmartText>
+      ) : null}
     </Animated.View>
   );
 
-  if (variant === 'overlay') {
+  if (variant === 'immersive') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} style={styles.overlayRoot} {...a11y}>
-        <View style={styles.overlayScrim} />
-        {panel}
-      </Animated.View>
+      <View
+        style={styles.immersiveRoot}
+        accessibilityRole="progressbar"
+        accessibilityLabel={a11yLabel}
+        accessibilityState={{ busy: true }}
+      >
+        <View style={styles.immersiveWash} pointerEvents="none" />
+        <View style={styles.immersiveAccent} pointerEvents="none" />
+        <View style={styles.immersiveContent}>{panel}</View>
+      </View>
     );
   }
 
   return (
-    <View style={styles.fullscreenRoot} {...a11y}>
-      <View style={styles.ambientWash} pointerEvents="none" />
-      <View style={styles.ambientAccent} pointerEvents="none" />
-      <Animated.View entering={FadeIn.duration(280)} style={styles.fullscreenContent}>
-        {panel}
-      </Animated.View>
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={a11yLabel}
+      accessibilityState={{ busy: true }}
+    >
+      {panel}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fullscreenRoot: {
+  immersiveRoot: {
     flex: 1,
     width: '100%',
     backgroundColor: colors.background.subtle,
   },
-  ambientWash: {
+  immersiveWash: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: rgbaFromHex(colors.primary.main, 0.035),
   },
-  ambientAccent: {
+  immersiveAccent: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -144,22 +144,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: borderRadius.xl * 2,
     borderBottomRightRadius: borderRadius.xl * 2,
   },
-  fullscreenContent: {
+  immersiveContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: responsiveSize.xl,
-  },
-  overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-    paddingHorizontal: responsiveSize.xl,
-  },
-  overlayScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.48)',
   },
   panel: {
     width: '100%',
@@ -174,8 +163,13 @@ const styles = StyleSheet.create({
     borderColor: colors.gray[100],
     ...cardChromeSm,
   },
+  panelCompact: {
+    maxWidth: moderateScale(300),
+    paddingTop: responsiveSize.xl,
+    paddingBottom: responsiveSize.lg,
+    paddingHorizontal: responsiveSize.md,
+  },
   panelElevated: {
-    zIndex: 1,
     ...(Platform.OS === 'ios' ? platformStyles.shadowMd : androidCardOutline),
   },
   logo: {
@@ -184,6 +178,11 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
     marginBottom: responsiveSize.lg,
     opacity: 0.9,
+  },
+  logoCompact: {
+    width: moderateScale(108),
+    height: moderateScale(30),
+    marginBottom: responsiveSize.md,
   },
   spinnerRing: {
     width: moderateScale(72),
@@ -196,22 +195,30 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: rgbaFromHex(colors.primary.main, 0.14),
   },
-  message: {
+  spinnerRingCompact: {
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
+    marginBottom: responsiveSize.md,
+  },
+  title: {
+    color: colors.text.primary,
+    textAlign: 'center',
+    fontWeight: '700',
+    marginBottom: responsiveSize.sm,
+    alignSelf: 'stretch',
+  },
+  subtitle: {
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
-    maxWidth: 260,
+    alignSelf: 'stretch',
   },
-  inlineRoot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: responsiveSize.sm,
-    paddingVertical: responsiveSize.sm,
-    paddingHorizontal: responsiveSize.md,
-  },
-  inlineMessage: {
-    flexShrink: 1,
-    lineHeight: 20,
+  hint: {
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: responsiveSize.md,
+    fontStyle: 'italic',
+    alignSelf: 'stretch',
   },
 });

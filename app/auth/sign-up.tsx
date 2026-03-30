@@ -13,7 +13,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeLg } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 export default function SignUpScreen() {
@@ -29,7 +31,7 @@ export default function SignUpScreen() {
   // Fallback UI while redirecting (in case of slow devices/network)
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: headerPaddingTop }]}
+      style={[screenChrome.container, { paddingTop: headerPaddingTop }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -42,14 +44,14 @@ export default function SignUpScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View style={styles.card} entering={FadeInDown.delay(80)}>
-          <Text style={styles.title} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Create App Login</Text>
-          <Text style={styles.subtitle} allowFontScaling={false} numberOfLines={2} ellipsizeMode="tail">
+          <Text style={styles.title}>Create App Login</Text>
+          <Text style={styles.subtitle}>
             Taking you to membership verification…
           </Text>
 
           <View style={styles.spinnerRow}>
             <ActivityIndicator size="small" color={colors.primary.main} />
-            <Text style={styles.spinnerText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">Loading</Text>
+            <Text style={styles.spinnerText}>Loading</Text>
           </View>
 
           {/* Helpful links in case navigation is interrupted */}
@@ -57,7 +59,7 @@ export default function SignUpScreen() {
             style={styles.supportContainer}
             onPress={() => router.push('/auth/member-support')}
           >
-            <Text style={styles.supportText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
+            <Text style={styles.supportText}>
               Need help? Contact our Concierge team
             </Text>
           </TouchableOpacity>
@@ -66,7 +68,7 @@ export default function SignUpScreen() {
             style={styles.signInContainer}
             onPress={() => router.push('/auth/sign-in')}
           >
-            <Text style={styles.signInText} allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail">
+            <Text style={styles.signInText}>
               Already created a login?{' '}
               <Text style={styles.signInLink}>Sign In</Text>
             </Text>
@@ -78,7 +80,6 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background.default },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -92,9 +93,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     padding: spacing.xxl,
-    ...shadows.lg,
-    borderWidth: 1,
-    borderColor: colors.gray[100],
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[200],
+    ...cardChromeLg,
   },
   title: {
     ...typography.h2,

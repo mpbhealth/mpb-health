@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors, spacing, typography, borderRadius, shadows } from '@/constants/theme';
+import { colors, spacing, typography, borderRadius } from '@/constants/theme';
+import { cardChromeMd, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { BackButton } from '@/components/common/BackButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -13,7 +15,7 @@ export default function StaffEssentialsScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? insets.top + 8 : spacing.lg }]}>
         <BackButton onPress={() => router.back()} />
       </View>
@@ -91,16 +93,15 @@ export default function StaffEssentialsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-  },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     backgroundColor: colors.background.default,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
   },
   scroll: {
     flex: 1,
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
-    ...shadows.md,
+    ...cardChromeMd,
   },
   title: {
     ...typography.h2,

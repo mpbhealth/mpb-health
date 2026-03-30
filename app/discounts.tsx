@@ -4,7 +4,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
   ActivityIndicator,
   BackHandler,
 } from 'react-native';
@@ -23,9 +22,17 @@ import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useDiscountServices, type DiscountService } from '@/hooks/useDiscountServices';
 import { colors, borderRadius } from '@/constants/theme';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, cardChromeSm } from '@/utils/scaling';
+import {
+  hubScreenHeader,
+  hubHeaderA11y,
+  hubScreenScroll,
+  hubListRow,
+  hubScreenStates,
+} from '@/utils/hubListScreenLayout';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { useResponsive } from '@/hooks/useResponsive';
+import { screenChrome } from '@/utils/screenChrome';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -35,7 +42,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -59,24 +65,20 @@ function AnimatedServiceCard({
   onPress: () => void;
 }) {
   const scale = useSharedValue(1);
-  const shadowOpacity = useSharedValue(0.1);
   const translateY = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateY: translateY.value }],
-    shadowOpacity: shadowOpacity.value,
   }));
 
   const handlePressIn = () => {
     scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
     translateY.value = withSpring(2, { damping: 15, stiffness: 300 });
-    shadowOpacity.value = withTiming(0.2, { duration: 150 });
   };
 
   const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
     translateY.value = withSpring(0, { damping: 15, stiffness: 300 });
-    shadowOpacity.value = withTiming(0.1, { duration: 150 });
   };
 
   const ServiceIcon = service.icon;
@@ -84,7 +86,7 @@ function AnimatedServiceCard({
   return (
     <Animated.View entering={FadeInUp.delay(300 + index * 100)} layout={Layout.springify()}>
       <AnimatedTouchableOpacity
-        style={[styles.serviceCard, animatedStyle]}
+        style={[hubListRow.card, animatedStyle]}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -92,43 +94,43 @@ function AnimatedServiceCard({
         accessibilityRole="button"
         accessibilityLabel={`Open ${service.title}`}
       >
-        <View style={styles.serviceContent}>
-        <View style={[styles.iconContainer, { backgroundColor: service.gradient }]}>
-          <ServiceIcon size={moderateScale(24)} color={service.color} />
-        </View>
-        <View style={styles.textContainer}>
-          <SmartText variant="body1" style={styles.serviceTitle}>
-            {service.title}
-          </SmartText>
-          <SmartText variant="body2" style={styles.serviceDescription}>
-            {service.description}
-          </SmartText>
+        <View style={hubListRow.rowInner}>
+          <View style={[hubListRow.iconTile, { backgroundColor: service.gradient }]}>
+            <ServiceIcon size={moderateScale(22)} color={service.color} />
+          </View>
+          <View style={styles.textContainer}>
+            <SmartText variant="body1" style={hubListRow.rowTitle}>
+              {service.title}
+            </SmartText>
+            <SmartText variant="body2" style={hubListRow.rowDescription}>
+              {service.description}
+            </SmartText>
 
-          {service.codes && service.codes.length > 0 && (
-            <View style={styles.codesContainer}>
-              <SmartText variant="caption" style={styles.codesHeader}>
-                Member Discount Codes:
-              </SmartText>
-              {service.codes.map((codeItem, i) => (
-                <View key={`${service.id}-code-${i}`} style={styles.codeRow}>
-                  <View style={[styles.codeChip, { backgroundColor: service.color }]}>
-                    <SmartText variant="caption" style={styles.codeText}>
-                      {codeItem.code}
+            {service.codes && service.codes.length > 0 && (
+              <View style={styles.codesContainer}>
+                <SmartText variant="caption" style={styles.codesHeader}>
+                  Member discount codes
+                </SmartText>
+                {service.codes.map((codeItem, i) => (
+                  <View key={`${service.id}-code-${i}`} style={styles.codeRow}>
+                    <View style={[styles.codeChip, { backgroundColor: service.color }]}>
+                      <SmartText variant="caption" style={styles.codeText}>
+                        {codeItem.code}
+                      </SmartText>
+                    </View>
+                    <SmartText variant="body2" style={styles.codeDescription}>
+                      {codeItem.description}
                     </SmartText>
                   </View>
-                  <SmartText variant="body2" style={styles.codeDescription}>
-                    {codeItem.description}
-                  </SmartText>
-                </View>
-              ))}
-            </View>
-          )}
+                ))}
+              </View>
+            )}
+          </View>
         </View>
-      </View>
 
-      <View style={[styles.chevronContainer, { backgroundColor: service.gradient }]}>
-        <ExternalLink size={moderateScale(18)} color={service.color} />
-      </View>
+        <View style={[hubListRow.openHint, { borderWidth: 0, backgroundColor: service.gradient }]}>
+          <ExternalLink size={moderateScale(18)} color={service.color} />
+        </View>
       </AnimatedTouchableOpacity>
     </Animated.View>
   );
@@ -141,7 +143,7 @@ export default function DiscountsScreen() {
   const { isTablet } = useResponsive();
   const { services, loading, error, refetch } = useDiscountServices();
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
-  const headerStyle = [styles.header, { paddingTop: headerPaddingTop }];
+  const headerStyle = [hubScreenHeader.bar, { paddingTop: headerPaddingTop }];
 
   // Disable swipe gesture when WebView is open
   useEffect(() => {
@@ -171,11 +173,13 @@ export default function DiscountsScreen() {
 
   if (selectedUrl) {
     return (
-      <Animated.View style={styles.container} entering={SlideInRight} exiting={SlideOutLeft}>
+      <Animated.View style={screenChrome.container} entering={SlideInRight} exiting={SlideOutLeft}>
         <View style={headerStyle}>
           <BackButton onPress={() => setSelectedUrl(null)} />
-          <View style={styles.headerContent}>
-            <SmartText variant="h3" style={styles.headerTitle}>Discounts</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h3" style={hubScreenHeader.detailTitle} {...hubHeaderA11y.detailTitle}>
+              Discounts
+            </SmartText>
           </View>
         </View>
         <WebViewContainer url={selectedUrl} />
@@ -185,14 +189,18 @@ export default function DiscountsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Discounts
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.loadingContainer}>
+        <View style={hubScreenStates.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <SmartText variant="body1" style={styles.loadingText}>Loading discounts...</SmartText>
+          <SmartText variant="body1" style={hubScreenStates.loadingText}>Loading discounts...</SmartText>
         </View>
       </View>
     );
@@ -200,18 +208,22 @@ export default function DiscountsScreen() {
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Discounts
+            </SmartText>
+          </View>
         </Animated.View>
-        <View style={styles.errorContainer}>
+        <View style={hubScreenStates.errorContainer}>
           <AlertCircle size={moderateScale(48)} color={colors.status.error} />
-          <SmartText variant="h3" style={styles.errorTitle}>Unable to Load Discounts</SmartText>
-          <SmartText variant="body2" style={styles.errorText}>{error}</SmartText>
-          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
+          <SmartText variant="h3" style={hubScreenStates.errorTitle}>Unable to Load Discounts</SmartText>
+          <SmartText variant="body2" style={hubScreenStates.errorText}>{error}</SmartText>
+          <TouchableOpacity style={hubScreenStates.retryButton} onPress={refetch}>
             <RefreshCw size={moderateScale(20)} color={colors.background.default} />
-            <SmartText variant="body1" style={styles.retryButtonText}>Retry</SmartText>
+            <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Retry</SmartText>
           </TouchableOpacity>
         </View>
       </View>
@@ -220,10 +232,14 @@ export default function DiscountsScreen() {
 
   if (services.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
           <BackButton onPress={() => router.back()} />
-          <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
+          <View style={hubScreenHeader.content}>
+            <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+              Discounts
+            </SmartText>
+          </View>
         </Animated.View>
         <EmptyState
           icon={<Percent size={moderateScale(48)} color={colors.gray[300]} />}
@@ -236,26 +252,31 @@ export default function DiscountsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={screenChrome.container}>
       <Animated.View style={headerStyle} entering={FadeInDown.delay(100)}>
         <BackButton onPress={() => router.back()} />
-        <SmartText variant="h2" style={styles.title}>Discounts</SmartText>
+        <View style={hubScreenHeader.content}>
+          <SmartText variant="h2" style={hubScreenHeader.screenTitle} {...hubHeaderA11y.screenTitle}>
+            Discounts
+          </SmartText>
+        </View>
       </Animated.View>
 
       <ScrollView
-        style={styles.content}
+        style={[hubScreenScroll.content, hubScreenScroll.contentShade]}
         overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+        contentContainerStyle={[screenChrome.scrollContent, hubScreenScroll.scrollPad, { paddingBottom: scrollContentPaddingBottom + responsiveSize.xl }]}
       >
-        <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
+        <View style={[hubScreenScroll.maxWidthContainer, isTablet && hubScreenScroll.tabletMaxWidth]}>
           <Animated.View entering={FadeInUp.delay(200)}>
-            <SmartText variant="body1" style={styles.description}>
+            <SmartText variant="body1" style={hubScreenScroll.description}>
               Save on prescriptions, supplements, and medical services with exclusive member discounts and special pricing.
             </SmartText>
           </Animated.View>
 
-          <View style={styles.servicesGrid}>
+          <View style={hubScreenScroll.listGap}>
             {services.map((service, index) => (
               <AnimatedServiceCard
                 key={service.id}
@@ -301,104 +322,10 @@ export default function DiscountsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.paper
-  },
-
-  header: {
-    backgroundColor: colors.background.default,
-    padding: responsiveSize.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: responsiveSize.xs,
-    minWidth: 0,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  title: {
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginLeft: responsiveSize.xs,
-  },
-
-  content: {
-    flex: 1
-  },
-  scrollContent: {
-    padding: responsiveSize.md,
-    paddingBottom: responsiveSize.xl,
-  },
-
-  maxWidthContainer: {
-    width: '100%',
-    alignSelf: 'center',
-  },
-  tabletMaxWidth: {
-    maxWidth: 900,
-  },
-
-  description: {
-    color: colors.text.secondary,
-    marginBottom: responsiveSize.lg,
-  },
-
-  servicesGrid: {
-    gap: responsiveSize.md,
-    marginBottom: responsiveSize.lg,
-  },
-
-  serviceCard: {
-    backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.md,
-    flexDirection: 'column',
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
-  },
-  serviceContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: responsiveSize.sm,
-    minWidth: 0,
-  },
-  iconContainer: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: responsiveSize.sm,
-    flexShrink: 0,
-  },
   textContainer: {
     flex: 1,
     minWidth: 0,
     gap: responsiveSize.xs / 2,
-  },
-  serviceTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  serviceDescription: {
-    color: colors.text.secondary,
-  },
-
-  chevronContainer: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    flexShrink: 0,
   },
 
   codesContainer: {
@@ -428,7 +355,7 @@ const styles = StyleSheet.create({
     minWidth: moderateScale(60),
     alignItems: 'center',
     justifyContent: 'center',
-    ...platformStyles.shadowSm,
+    ...cardChromeSm,
     flexShrink: 0,
   },
   codeText: {
@@ -441,6 +368,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     flex: 1,
     minWidth: 0,
+    lineHeight: 20,
   },
 
   supportCard: {
@@ -474,48 +402,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  loadingText: {
-    color: colors.text.secondary,
-  },
-
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: responsiveSize.xl,
-    gap: responsiveSize.md,
-  },
-  errorTitle: {
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  errorText: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: responsiveSize.lg,
-    paddingVertical: responsiveSize.sm,
-    borderRadius: borderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: responsiveSize.xs,
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadow,
-  },
-  retryButtonText: {
-    fontWeight: '600',
-    color: colors.background.default,
   },
 
 });

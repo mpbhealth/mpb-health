@@ -16,6 +16,21 @@ export interface AppNotification {
 
 const LIMIT = 100;
 
+type NotificationRow = {
+  id: string;
+  title: string;
+  body: string;
+  route: string | null;
+  type: string | null;
+  target_type: string;
+  created_at: string;
+};
+
+type NotificationReadRow = {
+  notification_id: string;
+  read_at: string;
+};
+
 export function useNotifications() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -50,7 +65,8 @@ export function useNotifications() {
       }
 
       // Hide broadcast notifications that were created before the user's account
-      const filtered = (rows ?? []).filter((r) => {
+      const list = (rows ?? []) as NotificationRow[];
+      const filtered = list.filter((r) => {
         if (r.target_type === 'all' && userCreatedAt) {
           return new Date(r.created_at) >= new Date(userCreatedAt);
         }
@@ -70,10 +86,11 @@ export function useNotifications() {
         .eq('user_id', userId)
         .in('notification_id', idList);
 
-      const readSet = new Set((reads ?? []).map((r) => r.notification_id));
+      const readRows = (reads ?? []) as NotificationReadRow[];
+      const readSet = new Set(readRows.map((r) => r.notification_id));
 
       setNotifications(
-        filtered.map((r) => ({
+        filtered.map((r: NotificationRow) => ({
           id: r.id,
           title: r.title,
           message: r.body,

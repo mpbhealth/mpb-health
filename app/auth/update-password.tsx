@@ -17,7 +17,9 @@ import { useRouter } from 'expo-router';
 import { Eye, EyeOff, AlertCircle, Check } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
-import { colors, shadows, typography, spacing, borderRadius } from '@/constants/theme';
+import { colors, typography, spacing, borderRadius } from '@/constants/theme';
+import { cardChromeLg, platformStyles } from '@/utils/scaling';
+import { screenChrome } from '@/utils/screenChrome';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 
 const logoImg = require('../../assets/images/logo.png');
@@ -119,7 +121,7 @@ export default function UpdatePasswordScreen() {
 
   if (!isValidSession && !error) {
     return (
-      <View style={styles.container}>
+      <View style={screenChrome.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Verifying reset link...</Text>
         </View>
@@ -129,12 +131,12 @@ export default function UpdatePasswordScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={screenChrome.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       <ScrollView
-        style={styles.container}
+        style={screenChrome.container}
         overScrollMode="never"
         contentContainerStyle={[styles.scrollContent, { paddingTop: headerPaddingTop, paddingBottom: scrollContentPaddingBottom }]}
         keyboardShouldPersistTaps="handled"
@@ -277,10 +279,6 @@ export default function UpdatePasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.default,
-  },
   scrollContent: {
     flexGrow: 1,
     padding: spacing.lg,
@@ -313,7 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
-    ...shadows.lg,
+    ...cardChromeLg,
   },
   title: {
     ...typography.h2,
@@ -420,7 +418,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     marginBottom: spacing.xl,
-    ...shadows.md,
+    ...(Platform.OS === 'ios' ? platformStyles.shadowMd : {}),
   },
   updateButtonDisabled: {
     opacity: 0.7,

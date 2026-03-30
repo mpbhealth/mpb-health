@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Platform,
-  Image,
   ScrollView,
   Linking,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -20,20 +20,23 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
+import { useTabScreenSafePadding } from '@/hooks/useSafeHeaderPadding';
 import { colors, borderRadius } from '@/constants/theme';
 import { SmartText } from '@/components/common/SmartText';
 import { Card } from '@/components/common/Card';
-import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles } from '@/utils/scaling';
+import { responsiveSize, moderateScale, MIN_TOUCH_TARGET, platformStyles, cardChromeSm } from '@/utils/scaling';
 import { useResponsive } from '@/hooks/useResponsive';
-
-const logoImg = require('../../assets/images/logo.png');
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { headerPaddingTop, scrollContentPaddingBottom, insets } = useSafeHeaderPadding();
+  const { headerPaddingTop, scrollContentPaddingBottom } = useTabScreenSafePadding();
+  const { width: screenWidth } = useWindowDimensions();
   const { isTablet } = useResponsive();
+
+  const contentPaddingHorizontal = useMemo(
+    () => (screenWidth <= 320 ? moderateScale(14) : moderateScale(20)),
+    [screenWidth]
+  );
 
   const conciergeHours = [
     { day: 'Mon – Fri', hours: '9:00 AM – 5:00 PM EST' },
@@ -99,40 +102,58 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
+      <Animated.View
+        entering={FadeInDown.delay(80)}
+        style={[
+          styles.header,
+          { paddingTop: headerPaddingTop, paddingHorizontal: contentPaddingHorizontal },
+        ]}
+      >
+        <View style={[styles.headerInner, isTablet && styles.headerInnerTablet]}>
+          <SmartText variant="overline" style={styles.headerOverline}>
+            Support
+          </SmartText>
+          <SmartText variant="h2" style={styles.headerTitle}>
+            Health Concierge
+          </SmartText>
+        </View>
+      </Animated.View>
+
       <ScrollView
         style={styles.scroll}
         overScrollMode="never"
         contentContainerStyle={[
-          styles.content,
+          styles.scrollContent,
           {
-            paddingTop: headerPaddingTop,
+            paddingHorizontal: contentPaddingHorizontal,
             paddingBottom: scrollContentPaddingBottom,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.maxWidthContainer, isTablet && styles.tabletMaxWidth]}>
-          <Animated.View entering={FadeInDown.delay(100)}>
-            <Card padding="lg" variant="elevated" style={styles.welcomeCard}>
-              <Image source={logoImg} style={styles.logo} resizeMode="contain" />
-              <SmartText variant="h2" style={styles.title}>
-                Health Concierge
-              </SmartText>
-              <SmartText variant="body1" style={styles.subtitle}>
-                Get personalized support for all your healthcare questions and needs.
-              </SmartText>
-            </Card>
+          <Animated.View entering={FadeInUp.delay(120)}>
+            <SmartText variant="body1" style={styles.intro}>
+              Get personalized support for all your healthcare questions and needs.
+            </SmartText>
           </Animated.View>
 
-          <View style={styles.divider} />
+          <View style={styles.sectionSpacer} />
 
           <Animated.View entering={FadeInUp.delay(200)}>
             <Card padding="lg" variant="elevated" style={styles.hoursCard}>
               <View style={styles.hoursHeader}>
-                <Clock size={moderateScale(20)} color={colors.primary.main} />
-                <SmartText variant="h4" style={styles.hoursTitle}>
-                  Support Hours
-                </SmartText>
+                <View style={styles.hoursHeaderIcon}>
+                  <Clock size={moderateScale(20)} color={colors.primary.main} />
+                </View>
+                <View style={styles.hoursHeaderText}>
+                  <SmartText variant="overline" style={styles.cardOverline}>
+                    Availability
+                  </SmartText>
+                  <SmartText variant="h4" style={styles.hoursTitle}>
+                    Support Hours
+                  </SmartText>
+                </View>
               </View>
 
               <SmartText variant="caption" style={styles.sectionLabel}>
@@ -173,7 +194,7 @@ export default function ChatScreen() {
             </Card>
           </Animated.View>
 
-          <View style={styles.divider} />
+          <View style={styles.sectionSpacer} />
 
           <Animated.View entering={FadeInUp.delay(400)} style={[styles.actions, isTablet && styles.actionsWide]}>
             <Animated.View entering={FadeInUp.delay(500)} layout={Layout.springify()}>
@@ -253,13 +274,37 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.paper
+    backgroundColor: colors.background.paper,
+  },
+  header: {
+    backgroundColor: colors.background.default,
+    paddingBottom: responsiveSize.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.gray[200],
+    ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
+    zIndex: 2,
+  },
+  headerInner: {
+    width: '100%',
+  },
+  headerInnerTablet: {
+    maxWidth: 1200,
+    alignSelf: 'center',
+  },
+  headerOverline: {
+    color: colors.primary.main,
+    marginBottom: responsiveSize.xs,
+    opacity: 0.9,
+  },
+  headerTitle: {
+    color: colors.text.primary,
+    fontWeight: '700',
   },
   scroll: {
-    flex: 1
+    flex: 1,
   },
-  content: {
-    paddingHorizontal: responsiveSize.lg,
+  scrollContent: {
+    paddingTop: responsiveSize.md,
   },
 
   maxWidthContainer: {
@@ -270,44 +315,43 @@ const styles = StyleSheet.create({
     maxWidth: 900,
   },
 
-  welcomeCard: {
-    alignItems: 'center',
-    marginBottom: responsiveSize.md,
-  },
-  logo: {
-    width: moderateScale(200),
-    height: moderateScale(50),
-    marginBottom: responsiveSize.xl,
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: responsiveSize.sm,
-    color: colors.text.primary,
-  },
-  subtitle: {
-    textAlign: 'center',
+  intro: {
     color: colors.text.secondary,
-    maxWidth: moderateScale(400),
+    lineHeight: moderateScale(22),
+    marginBottom: responsiveSize.xs,
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: colors.gray[200],
-    marginVertical: responsiveSize.lg,
+  sectionSpacer: {
+    height: responsiveSize.lg,
   },
 
   hoursCard: {
-    marginBottom: responsiveSize.md,
+    marginBottom: responsiveSize.sm,
   },
   hoursHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: responsiveSize.md,
     gap: responsiveSize.sm,
   },
+  hoursHeaderIcon: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: borderRadius.lg,
+    backgroundColor: `${colors.primary.main}12`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hoursHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardOverline: {
+    color: colors.primary.main,
+    marginBottom: responsiveSize.xs / 2,
+  },
   hoursTitle: {
     color: colors.text.primary,
-    flex: 1,
   },
   sectionLabel: {
     color: colors.text.secondary,
@@ -320,8 +364,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: responsiveSize.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.gray[200],
     gap: responsiveSize.sm,
   },
   lastHourRow: {
@@ -365,17 +409,23 @@ const styles = StyleSheet.create({
 
   actionButton: {
     backgroundColor: colors.background.default,
-    borderRadius: borderRadius.lg,
-    padding: responsiveSize.lg,
+    borderRadius: borderRadius.xl,
+    paddingVertical: responsiveSize.md,
+    paddingHorizontal: responsiveSize.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: MIN_TOUCH_TARGET,
-    ...platformStyles.shadowSm,
+    minHeight: MIN_TOUCH_TARGET + 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gray[100],
+    ...cardChromeSm,
   },
 
   chatBtn: {
     backgroundColor: colors.primary.main,
-    ...platformStyles.shadow,
+    borderWidth: 0,
+    borderRadius: borderRadius.full,
+    elevation: 0,
+    ...(Platform.OS === 'ios' ? platformStyles.shadow : {}),
   },
   actionInner: {
     flexDirection: 'row',
