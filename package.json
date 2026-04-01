@@ -1,6 +1,6 @@
 {
   "name": "mpb-health",
-  "version": "1.0.0",
+  "version": "1.4.1",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -15,7 +15,7 @@
     "test": "jest --watchAll",
     "doctor": "EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1 npx expo-doctor",
     "doctor:strict": "npx expo-doctor",
-    "supabase": "supabase"
+    "supabase:cli": "supabase"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -30,11 +30,11 @@
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
-    "expo-device": "~7.0.1",
+    "expo-device": "~8.0.10",
     "expo-font": "~14.0.11",
-    "expo-haptics": "~14.0.0",
+    "expo-haptics": "~15.0.8",
     "expo-linking": "~8.0.11",
-    "expo-notifications": "~0.31.2",
+    "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.23",
     "expo-screen-orientation": "~9.0.8",
     "expo-splash-screen": "~31.0.13",
@@ -66,6 +66,11 @@
     "typescript": "~5.9.2"
   },
   "private": true,
+  "overrides": {
+    "expo-notifications": {
+      "expo-constants": "$expo-constants"
+    }
+  },
   "expo": {
     "doctor": {
       "appConfigFieldsNotSyncedCheck": {

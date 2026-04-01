@@ -11,7 +11,7 @@ export default ({ config }) => ({
     ...config.expo,
     name: 'MPB Health',
     slug: 'mpb-health',
-    version: '1.3.0',
+    version: '1.4.1',
     // Allow all orientations for large screens (foldables, tablets); Android 16+ ignores portrait lock on large devices.
     orientation: 'default',
     scheme: 'mpbhealth',
@@ -26,7 +26,7 @@ export default ({ config }) => ({
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.mpb.health',
-      buildNumber: '133',
+      buildNumber: '135',
       associatedDomains: [
         'applinks:mpb.health',
         'applinks:*.supabase.co',
@@ -83,7 +83,7 @@ export default ({ config }) => ({
     android: {
       package: 'com.mpb.health',
       googleServicesFile: './google-services.json',
-      versionCode: 130,
+      versionCode: 132,
       targetSdkVersion: 35,
       proguardFiles: ['./proguard-rules.pro'],
       adaptiveIcon: {

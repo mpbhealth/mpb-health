@@ -4,6 +4,25 @@ import { Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { logger } from '@/lib/logger';
 
+/** Stored session exists but server rejected refresh (reinstall, revoked session, wrong project). */
+function isStaleRefreshTokenError(error: unknown): boolean {
+  if (error == null || typeof error !== 'object') return false;
+  const e = error as AuthError & { code?: string };
+  const msg = typeof e.message === 'string' ? e.message : '';
+  if (/invalid refresh token/i.test(msg) || /refresh token not found/i.test(msg)) {
+    return true;
+  }
+  return e.code === 'refresh_token_not_found';
+}
+
+async function clearLocalAuthStorage(): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // ignore — storage may already be empty
+  }
+}
+
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -12,15 +31,22 @@ export function useAuth() {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        // Add delay on iOS to ensure AsyncStorage is ready
-        if (Platform.OS === 'ios') {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Brief delay so AsyncStorage is ready on native (esp. cold start / dev client).
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        
+
         const { data: { session }, error } = await supabase.auth.getSession();
-        
+
         if (error) {
-          logger.error('Initial session error', error);
+          if (isStaleRefreshTokenError(error)) {
+            await clearLocalAuthStorage();
+            logger.debug('Cleared stale stored session (invalid refresh token)', {
+              message: error.message,
+            });
+          } else {
+            logger.error('Initial session error', error);
+          }
           setSession(null);
           setLoading(false);
           return;
@@ -30,7 +56,14 @@ export function useAuth() {
         setSession(session);
         setLoading(false);
       } catch (error) {
-        logger.error('Session initialization error', error);
+        if (isStaleRefreshTokenError(error)) {
+          await clearLocalAuthStorage();
+          logger.debug('Cleared stale stored session after init error', {
+            message: (error as AuthError).message,
+          });
+        } else {
+          logger.error('Session initialization error', error);
+        }
         setSession(null);
         setLoading(false);
       }
@@ -218,6 +251,10 @@ export function useAuth() {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    if (error && isStaleRefreshTokenError(error)) {
+      await clearLocalAuthStorage();
+      return;
+    }
     if (error) {
       throw error;
     }
