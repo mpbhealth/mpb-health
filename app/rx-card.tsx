@@ -11,6 +11,10 @@ import { screenChrome } from '@/utils/screenChrome';
 import { hubScreenHeader, hubHeaderA11y, hubScreenStates } from '@/utils/hubListScreenLayout';
 import { useSafeHeaderPadding } from '@/hooks/useSafeHeaderPadding';
 import { supabase } from '@/lib/supabase';
+import {
+  getRxCardSessionCache,
+  setRxCardSessionCache,
+} from '@/utils/rxCardSessionCache';
 import { AlertCircle, RefreshCw } from 'lucide-react-native';
 
 export default function RxCardScreen() {
@@ -47,17 +51,28 @@ export default function RxCardScreen() {
     }
   }, [accessToken, userData?.member_id]);
 
-  const fetchPDF = async () => {
+  const fetchPDF = async (opts?: { forceRefresh?: boolean }) => {
     if (!accessToken) {
       setError('Your RX card is currently unavailable. Please try again in a few moments or contact our concierge team for assistance.');
       return;
+    }
+
+    const membershipNumber = userData?.member_id || '1445611826';
+
+    if (!opts?.forceRefresh && Platform.OS !== 'web') {
+      const sessionCached = getRxCardSessionCache(membershipNumber);
+      if (sessionCached) {
+        setPdfUrl(sessionCached);
+        setError(null);
+        setPdfLoading(false);
+        return;
+      }
     }
 
     setPdfLoading(true);
     setError(null);
 
     try {
-      const membershipNumber = userData?.member_id || '1445611826';
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       const url = `${supabaseUrl}/functions/v1/fetch-rx-card?membershipNumber=${membershipNumber}`;
 
@@ -95,6 +110,7 @@ export default function RxCardScreen() {
           : Buffer.from(binary, 'binary').toString('base64');
         const dataUrl = `data:application/pdf;base64,${base64}`;
         setPdfUrl(dataUrl);
+        setRxCardSessionCache(membershipNumber, dataUrl);
       }
     } catch (err) {
       console.error('Error fetching PDF:', err);
@@ -154,7 +170,7 @@ export default function RxCardScreen() {
             Card Temporarily Unavailable
           </SmartText>
           <SmartText variant="body2" style={hubScreenStates.errorText}>{error}</SmartText>
-          <TouchableOpacity style={hubScreenStates.retryButton} onPress={fetchPDF}>
+          <TouchableOpacity style={hubScreenStates.retryButton} onPress={() => fetchPDF({ forceRefresh: true })}>
             <RefreshCw size={moderateScale(20)} color={colors.background.default} />
             <SmartText variant="body1" style={hubScreenStates.retryButtonText}>Try Again</SmartText>
           </TouchableOpacity>

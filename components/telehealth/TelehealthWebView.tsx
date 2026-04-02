@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Constants from 'expo-constants';
+import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SmartText } from '@/components/common/SmartText';
 import { buildWebViewInjectionScript } from '@/components/common/WebViewContainer';
@@ -293,9 +294,22 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
         onError={handleLoadError}
         onNavigationStateChange={handleNavChange}
         onShouldStartLoadWithRequest={(request) => {
-          const u = (request.url || '').trim().toLowerCase();
+          const raw = (request.url || '').trim();
+          const u = raw.toLowerCase();
           if (u.startsWith('javascript:')) return false;
           if (u.startsWith('file:')) return false;
+          /* Phone, email, SMS from portal CTAs — open system handlers instead of breaking WebView */
+          if (
+            u.startsWith('tel:') ||
+            u.startsWith('mailto:') ||
+            u.startsWith('sms:') ||
+            u.startsWith('smsto:') ||
+            u.startsWith('facetime:') ||
+            u.startsWith('facetime-audio:')
+          ) {
+            void Linking.openURL(raw).catch(() => {});
+            return false;
+          }
           return true;
         }}
         onHttpError={(syntheticEvent) => {
@@ -371,7 +385,7 @@ const styles = StyleSheet.create({
   },
   loadingScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.46)',
+    backgroundColor: 'rgba(15, 23, 42, 0.36)',
   },
   loadingPanelWrap: {
     width: '100%',

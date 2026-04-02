@@ -36,11 +36,14 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { useDeferredBusyIndicator } from '@/hooks/useDeferredBusyIndicator';
 import { routerPushSafe, routerReplaceSafe } from '@/utils/navigation';
 import { useScreenOrientationLock } from '@/hooks/useScreenOrientationLock';
 import { usePushTokenRegistration } from '@/hooks/usePushTokenRegistration';
 import { colors } from '@/constants/theme';
 import { applyAccessibleTextDefaults } from '@/utils/applyAccessibleTextDefaults';
+import { HealthWalletPortal } from '@/components/health-wallet/HealthWalletPortal';
+import { HealthWalletVisibilityProvider } from '@/contexts/HealthWalletVisibilityContext';
 
 applyAccessibleTextDefaults();
 
@@ -78,6 +81,7 @@ const MAX_HANDLED_IDS = 50;
 
 export default function RootLayout() {
   const { session, loading, signOut } = useAuth();
+  const showLoadingChrome = useDeferredBusyIndicator(loading, 260);
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   useFrameworkReady();
@@ -274,7 +278,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <SafeAreaProvider>
           <View style={{ flex: 1, backgroundColor: colors.background.paper }}>
-            <LoadingIndicator message="Loading…" />
+            {showLoadingChrome ? <LoadingIndicator /> : null}
             <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
           </View>
         </SafeAreaProvider>
@@ -286,32 +290,43 @@ export default function RootLayout() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: colors.background.default }}>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: 'slide_from_right',
-                gestureEnabled: true,
-                contentStyle: { backgroundColor: colors.background.default },
-              }}
-            >
-              <Stack.Screen
-                name="(tabs)"
-                options={{
+          <HealthWalletVisibilityProvider>
+            <View style={{ flex: 1, backgroundColor: colors.background.default }}>
+              <Stack
+                screenOptions={{
                   headerShown: false,
-                  gestureEnabled: false,
-                  animation: 'none',
+                  animation: 'slide_from_right',
+                  gestureEnabled: true,
+                  contentStyle: { backgroundColor: colors.background.default },
                 }}
-              />
+              >
+                <Stack.Screen
+                  name="(tabs)"
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: false,
+                    animation: 'none',
+                  }}
+                />
 
-              <Stack.Screen name="payment-history" options={{ headerShown: false }} />
+                <Stack.Screen name="payment-history" options={{ headerShown: false }} />
 
-              <Stack.Screen name="auth" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
-            </Stack>
-            <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
-          </View>
+                <Stack.Screen
+                  name="health-wallet"
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: false,
+                  }}
+                />
+
+                <Stack.Screen name="auth" options={{ headerShown: false, animation: 'fade' }} />
+                <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
+              </Stack>
+              <HealthWalletPortal />
+              <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
+            </View>
+          </HealthWalletVisibilityProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>
     </ErrorBoundary>

@@ -19,6 +19,7 @@
  *
  * ## UX
  * `fadeInOnLoad` (default true) briefly fades content in after load so the shell feels like the app.
+ * Loading state uses the shared `LoadingIndicator` overlay (logo + card) for consistency with other screens.
  */
 
 import React, {
@@ -35,7 +36,6 @@ import WebView, { WebViewMessageEvent, WebViewNavigation } from 'react-native-we
 import {
   StyleSheet,
   View,
-  ActivityIndicator,
   Platform,
   BackHandler,
   TouchableOpacity,
@@ -46,16 +46,19 @@ import {
   Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RefreshCw, ExternalLink } from 'lucide-react-native';
 import { SmartText } from '@/components/common/SmartText';
+import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles, MIN_TOUCH_TARGET } from '@/utils/scaling';
 
 const LOAD_TIMEOUT_MS = 25000;
 const PROGRESS_RESET_DELAY_MS = 400;
+const APP_UA_SUFFIX = `MPBHealth/${Constants.expoConfig?.version ?? 'dev'}`;
 
 export type WebViewEnhancementPreset = 'portal' | 'balanced' | 'full';
 
@@ -115,7 +118,7 @@ interface WebViewContainerProps {
   bridgeSafeAreaToPage?: boolean;
   /** After first paint, fade WebView opacity 0→1 for a softer hand-off from the loading overlay. Default true. */
   fadeInOnLoad?: boolean;
-  /** Optional: message shown under the loading spinner */
+  /** Copy for the shared LoadingIndicator overlay (default: same as home — “Just a moment…”). */
   loadingMessage?: string;
   /**
    * High-security mode for payment, health, and banking sites.
@@ -131,6 +134,30 @@ interface WebViewContainerProps {
   openInBrowserHosts?: (string | RegExp)[];
   /** When true and url matches openInBrowserHosts, open in system browser immediately and show the same UI. */
   openInBrowserAutoOpen?: boolean;
+  /**
+   * Android-only (`react-native-webview`). Default `hardware`; `software` avoids blank repaint bugs
+   * after the WebView was hidden or resized (common with off-screen “parked” portals).
+   */
+  androidLayerType?: 'none' | 'software' | 'hardware';
+  /** Android: text zoom %; use `100` so system font size doesn’t blow up third‑party layouts. */
+  textZoom?: number;
+  /**
+   * Android: WebView default `true` enables legacy whole-page scaling and often looks blurry on
+   * responsive sites; set `false` for viewport-based layouts (typical health portals).
+   */
+  scalesPageToFit?: boolean;
+  /** Android: improves scroll/gesture coordination (e.g. full-screen WebView + system chrome). */
+  nestedScrollEnabled?: boolean;
+  /**
+   * Third-party portals (HealthWallet, etc.): inline/fullscreen video, file download → in-app browser,
+   * `window.open` navigated in-place, and calmer camera/mic prompts for same-host uploads.
+   */
+  enablePortalRobustness?: boolean;
+  /**
+   * Android: when false, this WebView does not register `BackHandler` (avoids invisible parked
+   * WebViews eating global back). Host screen should call `goBack` / `router.back()` instead.
+   */
+  androidHandleHardwareBack?: boolean;
 }
 
 function safeAreaInjectFragment(
@@ -171,6 +198,12 @@ export function buildWebViewInjectionScript(
       m.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
       document.head.appendChild(m);
     }
+    if (!document.getElementById('mpb-portal-text-adjust')) {
+      var adj = document.createElement('style');
+      adj.id = 'mpb-portal-text-adjust';
+      adj.textContent = 'html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}';
+      document.head.appendChild(adj);
+    }
   } catch(err) {}
 })();
 true;
@@ -203,8 +236,8 @@ true;
         max-width: 100%;
         height: auto;
       }
-      input, textarea, select {
-        font-size: 16px;
+      input, textarea, select, [contenteditable="true"] {
+        font-size: max(16px, 1em);
       }
     \`;
     document.head.appendChild(style);
@@ -278,7 +311,7 @@ export const WebViewContainer = forwardRef(
       onLoadEnd,
       onError,
       userAgent,
-      headers = {},
+      headers,
 
       // keyboard props
       keyboardDisplayRequiresUserAction = false,
@@ -302,6 +335,12 @@ export const WebViewContainer = forwardRef(
       highSecurity = false,
       openInBrowserHosts = [],
       openInBrowserAutoOpen = false,
+      androidLayerType = 'hardware',
+      textZoom,
+      scalesPageToFit,
+      nestedScrollEnabled,
+      enablePortalRobustness = false,
+      androidHandleHardwareBack = true,
     }: WebViewContainerProps,
     ref: ForwardedRef<WebView>,
   ) => {
@@ -345,6 +384,22 @@ export const WebViewContainer = forwardRef(
         })!,
       [],
     );
+
+    const androidWebViewExtraProps = useMemo(() => {
+      if (Platform.OS !== 'android') {
+        return {};
+      }
+      const extra: {
+        androidLayerType: 'none' | 'software' | 'hardware';
+        textZoom?: number;
+        scalesPageToFit?: boolean;
+        nestedScrollEnabled?: boolean;
+      } = { androidLayerType };
+      if (textZoom != null) extra.textZoom = textZoom;
+      if (scalesPageToFit != null) extra.scalesPageToFit = scalesPageToFit;
+      if (nestedScrollEnabled != null) extra.nestedScrollEnabled = nestedScrollEnabled;
+      return extra;
+    }, [androidLayerType, nestedScrollEnabled, scalesPageToFit, textZoom]);
 
     // High-security: HTTPS-only whitelist; otherwise allow all origins for compatibility
     const originWhitelist = useMemo(
@@ -401,6 +456,40 @@ export const WebViewContainer = forwardRef(
       }
     };
 
+    const handlePortalOpenWindow = useCallback((event: { nativeEvent: { targetUrl?: string } }) => {
+      const targetUrl = event.nativeEvent?.targetUrl;
+      if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) return;
+      webViewRef.current?.injectJavaScript(
+        `window.location.replace(${JSON.stringify(targetUrl)}); true;`,
+      );
+    }, []);
+
+    const handlePortalFileDownload = useCallback((event: { nativeEvent: { downloadUrl?: string } }) => {
+      const u = event.nativeEvent?.downloadUrl;
+      if (!u) return;
+      void WebBrowser.openBrowserAsync(u, { enableBarCollapsing: true, showTitle: true }).catch(() => {
+        RNLinking.openURL(u).catch(() => {});
+      });
+    }, []);
+
+    const portalRobustnessProps = useMemo(() => {
+      if (!enablePortalRobustness) {
+        return null;
+      }
+      const base: Record<string, unknown> = {
+        onOpenWindow: handlePortalOpenWindow,
+      };
+      if (Platform.OS === 'ios') {
+        base.allowsInlineMediaPlayback = true;
+        base.mediaCapturePermissionGrantType = 'grantIfSameHostElsePrompt';
+        base.onFileDownload = handlePortalFileDownload;
+      }
+      if (Platform.OS === 'android') {
+        base.allowsFullscreenVideo = true;
+      }
+      return base;
+    }, [enablePortalRobustness, handlePortalFileDownload, handlePortalOpenWindow]);
+
     // When URL is in openInBrowserHosts and auto-open is on, open in browser on mount
     useEffect(() => {
       if (!shouldOpenInBrowser || !openInBrowserAutoOpen || !url) return;
@@ -430,15 +519,18 @@ export const WebViewContainer = forwardRef(
 
     // Android hardware back → WebView back first, then let navigator decide
     useEffect(() => {
+      if (Platform.OS !== 'android' || !androidHandleHardwareBack) {
+        return;
+      }
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (Platform.OS === 'android' && isMountedRef.current && canGoBackRef.current && webViewRef.current) {
+        if (isMountedRef.current && canGoBackRef.current && webViewRef.current) {
           webViewRef.current.goBack();
           return true;
         }
         return false;
       });
       return () => backHandler.remove();
-    }, []);
+    }, [androidHandleHardwareBack]);
 
     // Progress bar animation
     useEffect(() => {
@@ -460,7 +552,19 @@ export const WebViewContainer = forwardRef(
       onLoadStart?.();
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       loadTimeoutRef.current = setTimeout(() => {
-        if (isMountedRef.current) setIsLoading(false);
+        if (!isMountedRef.current) return;
+        setIsLoading(false);
+        setRefreshing(false);
+        // If onLoadEnd never runs (SPAs / client-side redirects), fade can stay at 0 while the
+        // overlay hides — looks like a permanent blank screen.
+        if (fadeInOnLoad) {
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 160,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start();
+        }
       }, LOAD_TIMEOUT_MS);
     };
 
@@ -508,6 +612,28 @@ export const WebViewContainer = forwardRef(
       canGoBackRef.current = next;
       onCanGoBackChange?.(next);
 
+      const navUrl = navState.url ?? '';
+      if (
+        navState.loading === false &&
+        navUrl.length > 0 &&
+        !/^about:/i.test(navUrl)
+      ) {
+        if (loadTimeoutRef.current) {
+          clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
+        setIsLoading(false);
+        setRefreshing(false);
+        if (fadeInOnLoad) {
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 120,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start();
+        }
+      }
+
       // Check for nested iframes (security)
       if (!allowNestedFrames && navState.url?.includes('iframe')) {
         console.warn('Nested iframe detected in:', navState.url);
@@ -535,9 +661,10 @@ export const WebViewContainer = forwardRef(
       };
     }, []);
 
-    // Calendly inline support (kept from your version)
     const isCalendly = url.includes('calendly.com');
-    const calendlyHtml = `
+    const calendlyHtml = useMemo(
+      () =>
+        `
       <!DOCTYPE html><html><head>
       <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
       <style>html, body {margin:0; padding:0; height:100%;}</style>
@@ -546,22 +673,29 @@ export const WebViewContainer = forwardRef(
       <script src="https://assets.calendly.com/assets/external/widget.js"></script>
       <script>
         Calendly.initInlineWidget({
-          url: "${url}",
+          url: "${url.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}",
           parentElement: document.getElementById("widget")
         });
       </script>
       </body></html>
-    `.trim();
+    `.trim(),
+      [url],
+    );
 
-    const source = isCalendly
-      ? { html: calendlyHtml }
-      : {
-          uri: url,
-          headers: {
-            ...(cookies ? { Cookie: cookies } : {}),
-            ...(headers || {}),
-          },
-        };
+    const webSource = useMemo(() => {
+      if (isCalendly) {
+        return { html: calendlyHtml };
+      }
+      const merged: Record<string, string> = {};
+      if (cookies) merged.Cookie = cookies;
+      if (headers && Object.keys(headers).length > 0) {
+        Object.assign(merged, headers);
+      }
+      if (Object.keys(merged).length === 0) {
+        return { uri: url };
+      }
+      return { uri: url, headers: merged };
+    }, [url, cookies, headers, isCalendly, calendlyHtml]);
 
     const uxInject = useMemo(
       () => buildWebViewInjectionScript(resolvedPreset, safeAreaForBridge),
@@ -683,8 +817,9 @@ export const WebViewContainer = forwardRef(
         <Animated.View style={[styles.webViewOuter, { opacity: fadeAnim }]}>
           <WebView
           ref={webViewRef as any}
+          {...(portalRobustnessProps ?? {})}
           originWhitelist={originWhitelist}
-          source={source}
+          source={webSource}
           style={[styles.webview, style]}
           injectedJavaScript={combinedInjectedJS}
           javaScriptEnabled={javaScriptEnabled}
@@ -702,6 +837,7 @@ export const WebViewContainer = forwardRef(
           onLoadProgress={handleProgress}
           startInLoadingState={false}
           userAgent={userAgent ?? defaultUA}
+          applicationNameForUserAgent={APP_UA_SUFFIX}
           allowFileAccess={!highSecurity}
           allowUniversalAccessFromFileURLs={!highSecurity}
           mediaPlaybackRequiresUserAction={false}
@@ -727,9 +863,15 @@ export const WebViewContainer = forwardRef(
               return false;
             }
 
-            // External protocols: open in OS
-            if (/^(intent:|tel:|mailto:|sms:|maps:|geo:)/i.test(nextUrl)) {
-              RNLinking.openURL(nextUrl);
+            // External protocols: open in OS (consistent with telehealth / member expectations)
+            if (
+              /^(intent:|tel:|mailto:|sms:|smsto:|maps:|geo:|facetime:|facetime-audio:)/i.test(
+                nextUrl,
+              )
+            ) {
+              void Linking.openURL(nextUrl).catch(() => {
+                RNLinking.openURL(nextUrl).catch(() => {});
+              });
               return false;
             }
 
@@ -746,43 +888,65 @@ export const WebViewContainer = forwardRef(
 
             return true;
           }}
-          // Handle HTTP errors gracefully
+          // Avoid full-screen error for 4xx on subresources (APIs, beacons); many SPAs still render.
           onHttpError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             const code = nativeEvent.statusCode ?? 0;
-            if (code >= 400) setHasError(true);
-          }}
-          // Handle render process crashes (Android)
-          onRenderProcessGone={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('WebView crashed:', nativeEvent);
-            if (nativeEvent.didCrash) {
+            if (code >= 500) {
               setHasError(true);
-              // Optionally reload after crash
-              setTimeout(() => {
-                if (isMountedRef.current) {
-                  webViewRef.current?.reload();
+              return;
+            }
+            if (code === 404 || code === 403) {
+              const failed = nativeEvent.url ?? '';
+              try {
+                const f = new URL(failed);
+                const m = new URL(url);
+                if (f.hostname === m.hostname && f.pathname === m.pathname) {
+                  setHasError(true);
                 }
-              }, 1000);
+              } catch {
+                /* ignore */
+              }
             }
           }}
+          onContentProcessDidTerminate={
+            Platform.OS === 'ios'
+              ? () => {
+                  if (!isMountedRef.current) return;
+                  setHasError(false);
+                  setIsLoading(true);
+                  if (fadeInOnLoad) fadeAnim.setValue(0);
+                  requestAnimationFrame(() => webViewRef.current?.reload());
+                }
+              : undefined
+          }
+          onRenderProcessGone={
+            Platform.OS === 'android'
+              ? () => {
+                  if (!isMountedRef.current) return;
+                  setHasError(false);
+                  setIsLoading(true);
+                  if (fadeInOnLoad) fadeAnim.setValue(0);
+                  requestAnimationFrame(() => webViewRef.current?.reload());
+                }
+              : undefined
+          }
           // iOS-only: content inset adjust for better fit
           contentInsetAdjustmentBehavior="automatic"
-          androidLayerType="hardware"
+          {...androidWebViewExtraProps}
+          overScrollMode="content"
           cacheEnabled={!highSecurity}
           cacheMode={highSecurity && Platform.OS === 'android' ? 'LOAD_NO_CACHE' : 'LOAD_DEFAULT'}
           incognito={!persistCookies}
         />
         </Animated.View>
 
-        {isLoading && (
-          <View style={[styles.loadingContainer, dark && styles.loadingContainerDark]}>
-            <ActivityIndicator size="large" color={colors.primary.main} />
-            {loadingMessage ? (
-              <SmartText variant="body2" style={styles.loadingMessage}>{loadingMessage}</SmartText>
-            ) : null}
-          </View>
-        )}
+        {isLoading ? (
+          <LoadingIndicator
+            variant="overlay"
+            message={loadingMessage ?? 'Just a moment…'}
+          />
+        ) : null}
       </View>
     );
   },
@@ -813,24 +977,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.main,
     zIndex: 1000,
     ...(Platform.OS === 'ios' ? platformStyles.shadowSm : {}),
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: `${colors.background.default}EE`,
-    gap: responsiveSize.md,
-  },
-  loadingContainerDark: {
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  loadingMessage: {
-    color: colors.text.secondary,
-    marginTop: responsiveSize.sm,
   },
   errorContainer: {
     flex: 1,

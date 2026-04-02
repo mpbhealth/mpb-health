@@ -1,15 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, ActivityIndicator, StyleSheet, Image, Platform } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
 import {
@@ -42,30 +33,13 @@ function rgbaFromHex(hex: string, alpha: number) {
 }
 
 export function LoadingIndicator({
-  message = 'Loading…',
+  message = 'Just a moment…',
   variant = 'fullscreen',
   appearance = 'default',
 }: LoadingIndicatorProps) {
   const inlineOnDark = appearance === 'onDark';
   const inlineSpinnerColor = inlineOnDark ? '#FFFFFF' : colors.primary.main;
   const inlineLabelColor = inlineOnDark ? 'rgba(255, 255, 255, 0.92)' : colors.text.secondary;
-
-  const ringPulse = useSharedValue(1);
-
-  useEffect(() => {
-    ringPulse.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 850, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 850, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-  }, [ringPulse]);
-
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ringPulse.value }],
-  }));
 
   const a11y = {
     accessibilityRole: 'progressbar' as const,
@@ -86,7 +60,7 @@ export function LoadingIndicator({
 
   const panel = (
     <Animated.View
-      entering={FadeInDown.duration(340)}
+      entering={FadeInDown.duration(420).delay(40)}
       style={[styles.panel, variant === 'overlay' && styles.panelElevated]}
     >
       <Image
@@ -95,9 +69,9 @@ export function LoadingIndicator({
         resizeMode="contain"
         accessibilityIgnoresInvertColors
       />
-      <Animated.View style={[styles.spinnerRing, ringStyle]}>
+      <View style={styles.spinnerRing}>
         <ActivityIndicator size="large" color={colors.primary.main} />
-      </Animated.View>
+      </View>
       <SmartText variant="body1" style={styles.message}>
         {message}
       </SmartText>
@@ -106,7 +80,7 @@ export function LoadingIndicator({
 
   if (variant === 'overlay') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} style={styles.overlayRoot} {...a11y}>
+      <Animated.View entering={FadeIn.duration(320)} style={styles.overlayRoot} {...a11y}>
         <View style={styles.overlayScrim} />
         {panel}
       </Animated.View>
@@ -117,7 +91,7 @@ export function LoadingIndicator({
     <View style={styles.fullscreenRoot} {...a11y}>
       <View style={styles.ambientWash} pointerEvents="none" />
       <View style={styles.ambientAccent} pointerEvents="none" />
-      <Animated.View entering={FadeIn.duration(280)} style={styles.fullscreenContent}>
+      <Animated.View entering={FadeIn.duration(380)} style={styles.fullscreenContent}>
         {panel}
       </Animated.View>
     </View>
@@ -132,15 +106,15 @@ const styles = StyleSheet.create({
   },
   ambientWash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: rgbaFromHex(colors.primary.main, 0.035),
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.02),
   },
   ambientAccent: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '36%',
-    backgroundColor: rgbaFromHex(colors.primary.main, 0.065),
+    height: '28%',
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.042),
     borderBottomLeftRadius: borderRadius.xl * 2,
     borderBottomRightRadius: borderRadius.xl * 2,
   },
@@ -159,7 +133,7 @@ const styles = StyleSheet.create({
   },
   overlayScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.48)',
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
   },
   panel: {
     width: '100%',
@@ -186,15 +160,15 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   spinnerRing: {
-    width: moderateScale(72),
-    height: moderateScale(72),
-    borderRadius: moderateScale(36),
-    backgroundColor: rgbaFromHex(colors.primary.main, 0.07),
+    width: moderateScale(64),
+    height: moderateScale(64),
+    borderRadius: moderateScale(32),
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.05),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: responsiveSize.lg,
+    marginBottom: responsiveSize.md,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: rgbaFromHex(colors.primary.main, 0.14),
+    borderColor: rgbaFromHex(colors.primary.main, 0.1),
   },
   message: {
     color: colors.text.secondary,

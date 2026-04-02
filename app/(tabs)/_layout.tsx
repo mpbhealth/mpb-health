@@ -19,6 +19,7 @@ import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { useDeferredBusyIndicator } from '@/hooks/useDeferredBusyIndicator';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles, androidBarElevation } from '@/utils/scaling';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -237,11 +238,12 @@ function AndroidAndFallbackTabsLayout() {
 
 export default function TabLayout() {
   const { session, loading } = useAuth();
+  const showLoadingChrome = useDeferredBusyIndicator(loading, 260);
 
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background.paper }}>
-        <LoadingIndicator message="Loading…" />
+        {showLoadingChrome ? <LoadingIndicator /> : null}
       </View>
     );
   }

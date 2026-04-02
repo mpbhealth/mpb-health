@@ -113,11 +113,17 @@ export function buildTelehealthBridgeScript(): string {
   function scrollToInput(element) {
     setTimeout(function() {
       var rect = element.getBoundingClientRect();
-      var visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+      var vh = window.innerHeight || 0;
+      var visible = rect.top >= 0 && rect.bottom <= vh;
       if (!visible) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        /* 'nearest' avoids large jumps that feel like the page "zoomed" or refreshed */
+        try {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        } catch (e) {
+          element.scrollIntoView(false);
+        }
       }
-    }, 300);
+    }, 150);
   }
 
   var hasHadActivity = false;

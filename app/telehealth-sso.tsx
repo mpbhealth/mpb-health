@@ -12,6 +12,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Stethoscope, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import Constants from 'expo-constants';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { BackButton } from '@/components/common/BackButton';
 import { TelehealthWebView, TelehealthWebViewRef } from '@/components/telehealth/TelehealthWebView';
 import { TelehealthLoadingPanel } from '@/components/telehealth/TelehealthLoadingPanel';
@@ -25,6 +26,7 @@ import { screenChrome } from '@/utils/screenChrome';
 
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAYS = [1000, 2000, 4000];
+const TELEHEALTH_KEEP_AWAKE_TAG = 'mpb-telehealth-portal';
 
 export default function TelehealthSSOScreen() {
   const router = useRouter();
@@ -60,6 +62,15 @@ export default function TelehealthSSOScreen() {
       checkPlanActivation();
     }
   }, [userLoading, userData, session, ssoUrl, isLoading]);
+
+  /** Long intake forms: avoid the display sleep mid-visit (especially on iOS). */
+  useEffect(() => {
+    if (!ssoUrl) return;
+    void activateKeepAwakeAsync(TELEHEALTH_KEEP_AWAKE_TAG);
+    return () => {
+      void deactivateKeepAwake(TELEHEALTH_KEEP_AWAKE_TAG);
+    };
+  }, [ssoUrl]);
 
   const checkPlanActivation = () => {
     if (!userData?.active_date) {

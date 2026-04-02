@@ -1,6 +1,6 @@
 {
   "name": "mpb-health",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -11,7 +11,9 @@
     "web": "expo start --web",
     "build:web": "expo export:web",
     "build:ios": "npx eas-cli build --platform ios --profile production",
+    "build:android": "npx eas-cli build --platform android --profile production",
     "submit:ios": "npx eas-cli submit --platform ios --profile production --latest",
+    "submit:android": "npx eas-cli submit --platform android --profile production --latest",
     "test": "jest --watchAll",
     "doctor": "EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1 npx expo-doctor",
     "doctor:strict": "npx expo-doctor",
@@ -32,6 +34,7 @@
     "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.10",
     "expo-font": "~14.0.11",
+    "expo-keep-awake": "~15.0.8",
     "expo-haptics": "~15.0.8",
     "expo-linking": "~8.0.11",
     "expo-notifications": "~0.32.16",

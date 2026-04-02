@@ -1,14 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet, ActivityIndicator, Image, Platform } from 'react-native';
-import Animated, {
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SmartText } from '@/components/common/SmartText';
 import { colors, borderRadius } from '@/constants/theme';
 import {
@@ -40,35 +32,18 @@ export type BrandedLoadingPanelProps = {
 };
 
 export function BrandedLoadingPanel({
-  title = 'Loading…',
+  title = 'One moment',
   subtitle,
   hint,
   compact = false,
   variant = 'card',
   elevated = false,
 }: BrandedLoadingPanelProps) {
-  const ringPulse = useSharedValue(1);
-
-  useEffect(() => {
-    ringPulse.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 850, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 850, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-  }, [ringPulse]);
-
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ringPulse.value }],
-  }));
-
   const a11yLabel = [title, subtitle, hint].filter(Boolean).join('. ');
 
   const panel = (
     <Animated.View
-      entering={FadeInDown.duration(340)}
+      entering={FadeInDown.duration(420).delay(40)}
       style={[
         styles.panel,
         compact && styles.panelCompact,
@@ -81,9 +56,9 @@ export function BrandedLoadingPanel({
         resizeMode="contain"
         accessibilityIgnoresInvertColors
       />
-      <Animated.View style={[styles.spinnerRing, compact && styles.spinnerRingCompact, ringStyle]}>
+      <View style={[styles.spinnerRing, compact && styles.spinnerRingCompact]}>
         <ActivityIndicator size="large" color={colors.primary.main} />
-      </Animated.View>
+      </View>
       <SmartText variant="h3" style={styles.title}>
         {title}
       </SmartText>
@@ -132,15 +107,15 @@ const styles = StyleSheet.create({
   },
   immersiveWash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: rgbaFromHex(colors.primary.main, 0.035),
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.02),
   },
   immersiveAccent: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '36%',
-    backgroundColor: rgbaFromHex(colors.primary.main, 0.065),
+    height: '28%',
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.042),
     borderBottomLeftRadius: borderRadius.xl * 2,
     borderBottomRightRadius: borderRadius.xl * 2,
   },
@@ -185,33 +160,33 @@ const styles = StyleSheet.create({
     marginBottom: responsiveSize.md,
   },
   spinnerRing: {
-    width: moderateScale(72),
-    height: moderateScale(72),
-    borderRadius: moderateScale(36),
-    backgroundColor: rgbaFromHex(colors.primary.main, 0.07),
+    width: moderateScale(64),
+    height: moderateScale(64),
+    borderRadius: moderateScale(32),
+    backgroundColor: rgbaFromHex(colors.primary.main, 0.05),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: responsiveSize.lg,
+    marginBottom: responsiveSize.md,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: rgbaFromHex(colors.primary.main, 0.14),
+    borderColor: rgbaFromHex(colors.primary.main, 0.1),
   },
   spinnerRingCompact: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(30),
-    marginBottom: responsiveSize.md,
+    width: moderateScale(56),
+    height: moderateScale(56),
+    borderRadius: moderateScale(28),
+    marginBottom: responsiveSize.sm,
   },
   title: {
     color: colors.text.primary,
     textAlign: 'center',
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: responsiveSize.sm,
     alignSelf: 'stretch',
   },
   subtitle: {
     color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
     alignSelf: 'stretch',
   },
   hint: {

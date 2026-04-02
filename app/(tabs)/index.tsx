@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { userHasHealthWalletProduct } from '@/utils/healthWallet';
 import {
   Play,
   Tag,
@@ -264,8 +265,7 @@ export default function HomeScreen() {
     }
   }, [pendingActivation, loading]);
 
-  const healthWalletProductIds = new Set(['44036', '45800', '45388', '46455', '45742','38036']);
-  const shouldShowHealthWallet = healthWalletProductIds.has(userData?.normalized_product_id ?? userData?.product_id ?? '');
+  const shouldShowHealthWallet = userHasHealthWalletProduct(userData);
   const hospitalDebtReliefProductIds = new Set(['42463', '45388']);
   const normalizedProductId = userData?.normalized_product_id ?? userData?.product_id;
 
