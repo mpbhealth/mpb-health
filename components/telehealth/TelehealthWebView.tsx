@@ -6,15 +6,22 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SmartText } from '@/components/common/SmartText';
 import { buildWebViewInjectionScript } from '@/components/common/WebViewContainer';
+import { logger } from '@/lib/logger';
 import { colors, borderRadius } from '@/constants/theme';
 import { responsiveSize, moderateScale, platformStyles } from '@/utils/scaling';
 import { buildTelehealthBridgeScript } from './telehealthWebViewInjection';
 import { TelehealthWebViewProps, WebViewMessage } from './types';
 import { TelehealthLoadingPanel } from './TelehealthLoadingPanel';
 import { TELEHEALTH_LOADING } from './telehealthLoadingCopy';
+
+/** Stable empty headers so `source` is not a new object every render (avoids spurious reloads). */
+const EMPTY_HEADERS: Record<string, string> = {};
+
+const APP_UA_SUFFIX = `MPBHealth/${Constants.expoConfig?.version ?? 'dev'}`;
 
 export interface TelehealthWebViewRef {
   goBackInWebView: () => boolean;
@@ -33,7 +40,7 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
   onFormStateChange,
   onFormSubmitSuccess,
   onSessionExpired,
-  headers = {},
+  headers,
   loadingSubtitle,
 }, ref) => {
   const webViewRef = useRef<WebView>(null);
@@ -47,8 +54,6 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
 
   const canGoBackRef = useRef(false);
   const initialUrlRef = useRef(initialUrl || url);
-  const freezeCountRef = useRef(0);
-  const isRecoveringFromFreezeRef = useRef(false);
   const currentUrlRef = useRef(url);
   const initialLoadFinishedRef = useRef(false);
 
@@ -74,6 +79,14 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
   });
 
   const webSubtitle = loadingSubtitle ?? TELEHEALTH_LOADING.subtitleWebView;
+
+  const webSource = useMemo(
+    () => ({
+      uri: url,
+      headers: headers && Object.keys(headers).length > 0 ? headers : EMPTY_HEADERS,
+    }),
+    [url, headers],
+  );
 
   useEffect(() => {
     initialUrlRef.current = initialUrl || url;
@@ -101,32 +114,16 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
           break;
 
         case 'freeze':
-          console.warn('WebView freeze detected:', message.data);
-          freezeCountRef.current += 1;
-
-          if (freezeCountRef.current <= 3 && !isRecoveringFromFreezeRef.current) {
-            isRecoveringFromFreezeRef.current = true;
-
-            setTimeout(() => {
-              if (webViewRef.current) {
-                console.log('Attempting to recover from freeze...');
-                webViewRef.current.reload();
-              }
-
-              setTimeout(() => {
-                isRecoveringFromFreezeRef.current = false;
-                freezeCountRef.current = 0;
-              }, 2000);
-            }, 500);
-          }
+          // Do NOT call reload() here: a full WebView reload wipes MyTelemedicine SPA / form state.
+          logger.warn('Telehealth WebView idle signal (no auto-reload)', message.data);
           break;
 
         case 'error':
-          console.error('WebView error:', message.data);
+          logger.error('Telehealth in-page bridge error', undefined, message.data);
           break;
       }
     } catch (error) {
-      console.error('Error handling WebView message:', error);
+      logger.error('Telehealth WebView message parse/handler error', error);
     }
   }, [handleFormStateChange, onFormSubmitSuccess, onFormStateChange]);
 
@@ -211,6 +208,20 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
     webViewRef.current?.reload();
   };
 
+  /** WKWebView / Chromium can terminate the render process under memory pressure. */
+  const recoverFromEngineRestart = useCallback(() => {
+    logger.warn('Telehealth WebView render process ended; reloading portal', {
+      platform: Platform.OS,
+    });
+    initialLoadFinishedRef.current = false;
+    setNavProgress(0);
+    setHasError(false);
+    setShowInitialOverlay(true);
+    requestAnimationFrame(() => {
+      webViewRef.current?.reload();
+    });
+  }, []);
+
   if (hasError) {
     return (
       <View style={styles.container}>
@@ -232,7 +243,11 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      accessibilityLabel="Telehealth portal"
+      accessibilityHint="Web content for your telehealth visit"
+    >
       {navProgress > 0 && (
         <View style={styles.progressTrack} pointerEvents="none">
           <View style={[styles.progressFill, { width: `${Math.min(100, navProgress * 100)}%` }]} />
@@ -240,11 +255,10 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
       )}
       <WebView
         ref={webViewRef}
-        source={{ uri: url, headers }}
+        source={webSource}
         style={styles.webview}
         originWhitelist={['*']}
         injectedJavaScript={injectedScript}
-        injectedJavaScriptBeforeContentLoaded={injectedScript}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         thirdPartyCookiesEnabled={true}
@@ -261,6 +275,7 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
         scrollEnabled={true}
         bounces={true}
         userAgent={userAgent}
+        applicationNameForUserAgent={APP_UA_SUFFIX}
         keyboardDisplayRequiresUserAction={false}
         hideKeyboardAccessoryView={false}
         allowsInlineMediaPlayback={true}
@@ -268,7 +283,10 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
         contentInsetAdjustmentBehavior="automatic"
         pullToRefreshEnabled={false}
         androidLayerType="hardware"
+        overScrollMode="content"
         onMessage={handleMessage}
+        onContentProcessDidTerminate={Platform.OS === 'ios' ? recoverFromEngineRestart : undefined}
+        onRenderProcessGone={Platform.OS === 'android' ? recoverFromEngineRestart : undefined}
         onLoadStart={handleLoadStart}
         onLoadProgress={handleLoadProgress}
         onLoadEnd={handleLoadEnd}
@@ -281,9 +299,24 @@ export const TelehealthWebView = forwardRef<TelehealthWebViewRef, TelehealthWebV
           return true;
         }}
         onHttpError={(syntheticEvent) => {
+          // Subresources (APIs, analytics) often return 401/403 while the member session is fine.
+          // Tearing down the WebView here caused false "session expired" and full portal loss.
           const { nativeEvent } = syntheticEvent;
-          if (nativeEvent.statusCode === 401 || nativeEvent.statusCode === 403) {
-            onSessionExpired?.();
+          if (nativeEvent.statusCode !== 401 && nativeEvent.statusCode !== 403) {
+            return;
+          }
+          try {
+            const errHost = new URL(nativeEvent.url).hostname;
+            const portal = new URL(initialUrlRef.current || url);
+            const isDocLike =
+              !nativeEvent.url.includes('/api/') &&
+              !nativeEvent.url.includes('/v1/') &&
+              !nativeEvent.url.includes('/graphql');
+            if (errHost === portal.hostname && isDocLike) {
+              onSessionExpired?.();
+            }
+          } catch {
+            /* ignore */
           }
         }}
       />

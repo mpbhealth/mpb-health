@@ -19,8 +19,9 @@ export function buildTelehealthBridgeScript(): string {
   var saveTimer = null;
   var scrollTimer = null;
   var mutationThrottleTimer = null;
-  var FREEZE_IDLE_MS = 20000;
-  var FREEZE_CHECK_MS = 8000;
+  /* Long idle before "freeze" signal — short thresholds matched members reading / filling long forms. */
+  var FREEZE_IDLE_MS = 120000;
+  var FREEZE_CHECK_MS = 20000;
 
   function detectFormPage() {
     var forms = document.querySelectorAll('form');
@@ -184,6 +185,23 @@ export function buildTelehealthBridgeScript(): string {
         });
       }, 500);
     }, { passive: true });
+
+    /* Returning from app switcher / bfcache: refresh activity + sync dirty flag to native */
+    document.addEventListener('visibilitychange', function() {
+      lastActivityTime = Date.now();
+      if (document.visibilityState === 'visible') {
+        detectFormPage();
+        scheduleFormStateSave();
+      }
+    }, true);
+
+    window.addEventListener('pageshow', function(ev) {
+      lastActivityTime = Date.now();
+      if (ev.persisted) {
+        detectFormPage();
+        scheduleFormStateSave();
+      }
+    }, true);
   }
 
   function scheduleMutationCheck() {
@@ -207,8 +225,13 @@ export function buildTelehealthBridgeScript(): string {
       if (!document.getElementById('telehealth-bridge-base') && document.head) {
         var lightStyle = document.createElement('style');
         lightStyle.id = 'telehealth-bridge-base';
+        /* iOS WKWebView auto-zooms focused fields when computed font-size is below 16px.
+           max(16px, 1em) preserves larger vendor text and fixes small SSO form controls. */
         lightStyle.textContent =
-          'input, textarea, select { -webkit-tap-highlight-color: rgba(0,0,0,0); }';
+          'input, textarea, select, [contenteditable="true"] {' +
+          ' -webkit-tap-highlight-color: rgba(0,0,0,0);' +
+          ' font-size: max(16px, 1em) !important;' +
+          ' }';
         document.head.appendChild(lightStyle);
       }
     } catch (e) {}

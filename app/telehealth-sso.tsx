@@ -47,11 +47,19 @@ export default function TelehealthSSOScreen() {
   const [planStartDate, setPlanStartDate] = useState<string | null>(null);
   const telehealthWebViewRef = React.useRef<TelehealthWebViewRef>(null);
 
+  /**
+   * Start SSO only when opening the portal. Do NOT re-run when `session` or `userData`
+   * refresh (e.g. Supabase TOKEN_REFRESHED) while the WebView is open — that would fetch a
+   * new SSO URL, change `source.uri`, and reload the portal (members lose form progress).
+   */
   useEffect(() => {
     if (!userLoading && userData && session) {
+      if (ssoUrl || isLoading) {
+        return;
+      }
       checkPlanActivation();
     }
-  }, [userLoading, userData, session]);
+  }, [userLoading, userData, session, ssoUrl, isLoading]);
 
   const checkPlanActivation = () => {
     if (!userData?.active_date) {
